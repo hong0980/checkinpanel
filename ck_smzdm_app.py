@@ -1,18 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-cron: 51 9 * * *
+cron: 50 7 * * *
 new Env('什么值得买APP');
 """
-
 
 import requests
 import json
 import time
 import hashlib
-
 from notify_mtr import send
 from utils import get_data
-
 
 class Smzdm:
     def __init__(self, check_items):

@@ -2,15 +2,18 @@
 
 # shellcheck disable=SC2005,2188
 <<'COMMENT'
-cron: 16 */2 * * *
+cron: 1 1 1 1 *
 new Env('签到依赖');
 COMMENT
 
 . utils_env.sh
 get_some_path
+checkinpanel_master=$(find "${SCR_PATH}" -type d -name "*checkinpanel_master" -print -quit 2>/dev/null)
+checkinpanel_master=${checkinpanel_master##*/}
+checkinpanel_master=${checkinpanel_master:-"OreosLab_checkinpanel_master"}
 
 alpine_pkgs="bash curl gcc git jq libffi-dev make musl-dev openssl-dev perl perl-app-cpanminus perl-dev py3-pip python3 python3-dev wget"
-py_reqs="bs4 cryptography dateparser feedparser peewee pyaes pyppeteer requests rsa schedule tomli"
+py_reqs="cryptography dateparser feedparser peewee requests_html rsa schedule tomli lxml_html_clean"
 js_pkgs="@iarna/toml axios cron-parser crypto-js got"
 pl_mods="File::Slurp JSON5 TOML::Dumper"
 
@@ -18,15 +21,11 @@ install() {
     count=0
     flag=$1
     while true; do
-        echo ".......... $2 begin .........."
+        echo ".......... 开始安装 ${2##* } .........."
         result=$3
-        if [ "$result" -gt 0 ]; then
-            flag=0
-        else
-            flag=1
-        fi
+        [ "$result" -gt 0 ] && flag=0 || flag=1
         if [ $flag -eq "$1" ]; then
-            echo "---------- $2 succeed ----------"
+            echo "---------- $2 成功安装 ----------"
             break
         else
             count=$((count + 1))
@@ -34,80 +33,95 @@ install() {
                 echo "!! 自动安装失败，请尝试进入容器后执行 $2 !!"
                 break
             fi
-            echo ".......... retry in 5 seconds .........."
+            echo ".......... 5 秒后重试 .........."
             sleep 5
         fi
     done
 }
 
+check_alpine_pkg_installed() {
+    apk info -e "$1" >/dev/null 2>&1
+    return $?
+}
+
+check_python_pkg_installed() {
+    pip show "$1" >/dev/null 2>&1
+    return $?
+}
+
 install_alpine_pkgs() {
     apk update
-    apk_info=" $(apk info) "
-    for i in $alpine_pkgs; do
-        if expr "$apk_info" : ".*\s${i}\s.*" >/dev/null; then
-            echo "$i 已安装"
+    for pkg in $alpine_pkgs; do
+        if check_alpine_pkg_installed "$pkg"; then
+            echo "$pkg 已安装"
         else
-            install 0 "apk add $i" "$(apk add --no-cache "$i" | grep -c 'OK')"
+            install 0 "apk add $pkg" "$(apk add --no-cache "$pkg" | grep -c 'OK')"
         fi
     done
 }
 
 install_py_reqs() {
     pip3 install --upgrade pip
-    pip3_freeze="$(pip3 freeze)"
-    for i in $py_reqs; do
-        if expr "$pip3_freeze" : ".*${i}" >/dev/null; then
-            echo "$i 已安装"
+    for req in $py_reqs; do
+        if check_python_pkg_installed "$req"; then
+            echo "$req 已安装"
         else
-            install 0 "pip3 install $i" "$(pip3 install "$i" | grep -c 'Successfully')"
+            install 0 "pip3 install $req" "$(pip3 install "$req" | grep -c 'Successfully')"
         fi
     done
 }
 
 install_js_pkgs_initial() {
-    if [ -d "${SCR_PATH}/OreosLab_checkinpanel_master" ]; then
-        cd "${SCR_PATH}/OreosLab_checkinpanel_master" &&
-            cp "${REPO_PATH}/OreosLab_checkinpanel_master/package.json" "${SCR_PATH}/OreosLab_checkinpanel_master/package.json"
+    if [ -d "${SCR_PATH}/${checkinpanel_master}" ]; then
+        cd "${SCR_PATH}/${checkinpanel_master}" || return
+        cp "${REPO_PATH}/${checkinpanel_master}/package.json" "${SCR_PATH}/${checkinpanel_master}/package.json"
     elif [ -d "/ql/scripts" ] && [ ! -f "/ql/scripts/package.bak.json" ]; then
-        cd /ql/scripts || exit
-        rm -rf node_modules
-        rm -rf .pnpm-store
+        cd /ql/scripts || return
+        rm -rf node_modules .pnpm-store
         mv package-lock.json package-lock.bak.json
         mv package.json package.bak.json
         mv pnpm-lock.yaml pnpm-lock.bak.yaml
-        install 1 "npm install -g package-merge" "$(echo "$(npm install -g package-merge && npm ls -g package-merge)" | grep -cE '(empty)|ERR')" &&
+
+        install 1 "npm install -g package-merge" "$(npm install -g package-merge && npm ls -g package-merge | grep -cE '(empty)|ERR')" &&
             export NODE_PATH="/usr/local/lib/node_modules" &&
-            node -e \
-                "const merge = require('package-merge');
-                 const fs = require('fs');
-                 const dst = fs.readFileSync('/ql/repo/OreosLab_checkinpanel_master/package.json');
-                 const src = fs.readFileSync('/ql/scripts/package.bak.json');
-                 fs.writeFile('/ql/scripts/package.json', merge(dst, src), function (err) {
-                     if (err) {
-                         console.log(err);
-                     }
-                     console.log('package.json merged successfully!');
-                 });"
+            node -e "
+                const merge = require('package-merge');
+                const fs = require('fs');
+                const dst = fs.readFileSync('/ql/repo/${checkinpanel_master}/package.json');
+                const src = fs.readFileSync('/ql/scripts/package.bak.json');
+                fs.writeFile('/ql/scripts/package.json', merge(dst, src), function (err) {
+                    if (err) {
+                        console.log(err);
+                    } else {
+                        console.log('package.json merged successfully!');
+                    }
+                });
+            " || return
     fi
-    npm install
+    npm install || return
 }
+
 install_js_pkgs_each() {
     is_empty=$(npm ls "$1" | grep empty)
     has_err=$(npm ls "$1" | grep ERR)
-    if [ "$is_empty" = "" ] && [ "$has_err" = "" ]; then
+    
+    if [ -z "$is_empty" ] && [ -z "$has_err" ]; then
         echo "$1 已正确安装"
-    elif [ "$has_err" != "" ]; then
-        uninstall_js_pkgs "$1"
     else
-        install 1 "npm install $1" "$(echo "$(npm install --force "$1" && npm ls --force "$1")" | grep -cE '(empty)|ERR')"
+        if [ -n "$has_err" ]; then
+            uninstall_js_pkgs "$1"
+        fi
+        install 1 "npm install $1" "$(npm install --force "$1" && npm ls --force "$1" | grep -cE '(empty)|ERR')"
     fi
 }
+
 uninstall_js_pkgs() {
     npm uninstall "$1"
-    rm -rf "$(pwd)"/node_modules/"$1"
+    rm -rf "$(pwd)/node_modules/$1"
     rm -rf /usr/local/lib/node_modules/lodash/*
     npm cache clear --force
 }
+
 install_js_pkgs_all() {
     install_js_pkgs_initial
     for i in $js_pkgs; do
@@ -120,23 +134,23 @@ install_pl_mods() {
     if command -v cpm >/dev/null 2>&1; then
         echo "App::cpm 已安装"
     else
-        install 1 "cpanm -fn App::cpm" "$(cpanm -fn App::cpm | grep -c "FAIL")"
+        install 1 "cpanm -fn App::cpm" "$(cpanm -fn App::cpm | grep -c 'FAIL')"
+        
         if ! command -v cpm >/dev/null 2>&1; then
             if [ -f ./cpm ]; then
                 chmod +x cpm && ./cpm --version
             else
-                cp -f /ql/repo/OreosLab_checkinpanel_master/cpm ./ && chmod +x cpm && ./cpm --version
-                if [ ! -f ./cpm ]; then
-                    curl -fsSL https://cdn.jsdelivr.net/gh/Oreomeow/checkinpanel/cpm >cpm && chmod +x cpm && ./cpm --version
-                fi
+                cp -f /ql/repo/${checkinpanel_master}/cpm ./ && chmod +x cpm && ./cpm --version ||
+                curl -fsSL https://cdn.jsdelivr.net/gh/Oreomeow/checkinpanel/cpm >cpm && chmod +x cpm && ./cpm --version
             fi
         fi
     fi
+    
     for i in $pl_mods; do
-        if [ -f "$(perldoc -l "$i")" ]; then
+        if perldoc -l "$i" > /dev/null 2>&1; then
             echo "$i 已安装"
         else
-            install 1 "cpm install -g $i" "$(cpm install -g "$i" | grep -c "FAIL")"
+            install 1 "cpm install -g $i" "$(cpm install -g "$i" | grep -c 'FAIL')"
         fi
     done
 }

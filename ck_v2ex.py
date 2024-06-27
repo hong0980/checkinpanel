@@ -1,104 +1,103 @@
 # -*- coding: utf-8 -*-
 """
-cron: 10 19 * * *
+cron: 10 11 * * *
 new Env('V2EX');
 """
 
-import re
-
-import requests
-import urllib3
-
-from notify_mtr import send
 from utils import get_data
-
-urllib3.disable_warnings()
-
+from notify_mtr import send
 
 class V2ex:
     def __init__(self, check_items):
         self.check_items = check_items
-        self.url = "https://www.v2ex.com/mission/daily"
 
-    def sign(self, session):
-        msg = ""
+    @staticmethod
+    def sign(cookie):
+        from selenium import webdriver
+        from selenium_stealth import stealth
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.common.exceptions import NoSuchElementException
+        from selenium.webdriver.support import expected_conditions as EC
 
-        response = session.get(self.url, verify=False)
-        pattern = (
-            r"<input type=\"button\" class=\"super normal button\""
-            r" value=\".*?\" onclick=\"location\.href = \'(.*?)\';\" />"
+        options = webdriver.ChromeOptions()
+        options.add_argument('--headless')  # 无头模式
+        options.add_argument('--no-sandbox')
+        options.add_argument("start-maximized")
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+
+        service = webdriver.ChromeService(
+            log_output='/tmp/v2ex.log',
+            executable_path='/usr/bin/chromedriver',
+            service_args=['--readable-timestamp', '--disable-build-check']
         )
-        urls = re.findall(pattern, response.text)
-        url = urls[0] if urls else None
-        if url is None:
-            return "cookie 可能过期"
-        if url != "/balance":
-            data = {"once": url.split("=")[-1]}
-            session.get(
-                f'https://www.v2ex.com{url.split("?")[0]}', verify=False, params=data
-            )
 
-        response = session.get("https://www.v2ex.com/balance", verify=False)
-        totals = re.findall(
-            r"<td class=\"d\" style=\"text-align: right;\">(\d+\.\d+)</td>",
-            response.text,
+        driver = webdriver.Chrome(service=service, options=options)
+        stealth(driver,
+            platform="Win32",
+            fix_hairline=True,
+            vendor="Google Inc.",
+            languages=["zh-CN", "zh"],
+            webgl_vendor="Intel Inc.",
+            renderer="Intel Iris OpenGL Engine",
         )
-        total = totals[0] if totals else "签到失败"
-        today = re.findall(
-            r'<td class="d"><span class="gray">(.*?)</span></td>', response.text
-        )
-        today = today[0] if today else "签到失败"
 
-        usernames = re.findall(
-            r"<a href=\"/member/.*?\" class=\"top\">(.*?)</a>", response.text
-        )
-        username = usernames[0] if usernames else "用户名获取失败"
+        try:
+            result = ''
+            url = 'https://www.v2ex.com/'
+            daily_url = 'https://www.v2ex.com/mission/daily'
+            driver.get(url)
 
-        msg += f"帐号信息: {username}\n今日签到: {today}\n帐号余额: {total}"
+            for single_cookie in cookie.split('; '):
+                name, value = single_cookie.split('=', 1)
+                driver.add_cookie({'name': name, 'value': value})
 
-        response = session.get(url=self.url, verify=False)
-        datas = re.findall(r"<div class=\"cell\">(.*?)天</div>", response.text)
-        data = f"{datas[0]} 天" if datas else "获取连续签到天数失败"
-        msg += f"\n签到天数: {data}"
+            driver.refresh()
 
-        msg = msg.strip()
-        return msg
+            if '现在注册' in driver.page_source:
+                result += 'Cookie失效，请重新修改'
+            elif '登出' in driver.page_source:
+                driver.get(daily_url)
+                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'super')))
+                sign_button = driver.find_element(By.CLASS_NAME, 'super')
+                try:
+                    if '领取' in sign_button.get_attribute('value'):
+                        sign_button.click()
+                        driver.refresh()
+                        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'super')))
+                        sign_button = driver.find_element(By.CLASS_NAME, 'super')
+                        if '账户余额' in sign_button.get_attribute('value'):
+                            cell = driver.find_element(By.XPATH, '//div[@id="Main"]/div[2]/div[3]').text
+                            money = driver.find_element(By.CLASS_NAME, 'balance_area').text.replace('\n', '')
+                            result += f'签到成功\n{cell}\n余额：{money}'
+                    else:
+                        cell = driver.find_element(By.XPATH, '//div[@id="Main"]/div[2]/div[3]').text
+                        money = driver.find_element(By.CLASS_NAME, 'balance_area').text.replace('\n', '')
+                        result += f'今天已经签到\n{cell}\n余额：{money}'
+                except NoSuchElementException as e:
+                    result += f'签到失败\n{e}'
+
+        finally:
+            # driver.get('https://bot.sannysoft.com/')
+            # total_height = driver.execute_script("return document.body.scrollHeight")
+            # driver.set_window_size(1920, total_height)
+            # driver.save_screenshot('/tmp/screenshot.png')
+            driver.quit()
+        
+        return result
 
     def main(self):
         msg_all = ""
-        for check_item in self.check_items:
-            cookie = {
-                item.split("=")[0]: item.split("=")[1]
-                for item in check_item.get("cookie").split("; ")
-            }
-
-            session = requests.session()
-            if check_item.get("proxy", ""):
-                proxies = {
-                    "http": check_item.get("proxy", ""),
-                    "https": check_item.get("proxy", ""),
-                }
-                session.proxies.update(proxies)
-            session.cookies.update(cookie)
-            session.headers.update(
-                {
-                    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36",
-                    "referer": self.url,
-                    "accept": "text/html,application/xhtml+xml,application/xml;"
-                    "q=0.9,image/webp,image/apng,*/*;"
-                    "q=0.8,application/signed-exchange;v=b3;q=0.9",
-                    "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
-                }
-            )
-
-            msg = self.sign(session)
+        for i, check_item in enumerate(self.check_items, start=1):
+            cookie = check_item.get("cookie")
+            msg = f"---- 账号({i})V2EX 签到状态 ----\n{self.sign(cookie)}"
             msg_all += msg + "\n\n"
         return msg_all
-
 
 if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("V2EX", [])
     result = V2ex(check_items=_check_items).main()
     send("V2EX", result)
+    # print(result)
