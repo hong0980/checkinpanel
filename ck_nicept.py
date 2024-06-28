@@ -34,10 +34,7 @@ class nicept:
             res += f'pthome 签到成功\n这是您的第{result[0]}次签到，已连续签到{result[1]}天，本次签到获得{result[2]}个魔力值。'
         else:
             res += "签到失败"
-        finally:
-            if session:
-                session.close()
-            return res
+        return res
 
     def main(self):
         msg_all = ""

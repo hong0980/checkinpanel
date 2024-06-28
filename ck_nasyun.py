@@ -25,7 +25,7 @@ class nasyun:
         }
         try:
             response = session.get(url, headers=headers, timeout=10)
-            if '我的' in response.text
+            if '我的' in response.text:
                 devote = re.findall("<li><em> 贡献: </em>(.*?) </li>", response.text)[0]
                 active = re.findall("<li><em> 活跃: </em>(.*?) </li>", response.text)[0]
                 point = re.findall("<em>积分: </em>(.*?) <span", response.text)[0]

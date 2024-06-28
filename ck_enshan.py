@@ -16,7 +16,6 @@ class Enshan:
     @staticmethod
     def sign(cookie):
         res = ''
-        url = "https://www.right.com.cn/FORUM/home.php?mod=spacecp&ac=credit&showcredit=1"
         headers = {
             "Cookie": cookie,
             "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; WOW64) "
@@ -29,6 +28,7 @@ class Enshan:
             if r.status_code == 200:
                 try:
                     if '退出' in r.text:
+                        url = "https://www.right.com.cn/forum/home.php?mod=spacecp&ac=credit&showcredit=1"
                         response = session.get(url, headers=headers, timeout=10)
                         coin = re.findall("恩山币: </em>(.*?) 币 &nbsp", response.text)[0]
                         point = re.findall("<em>积分: </em>(.*?) <span", response.text)[0]
