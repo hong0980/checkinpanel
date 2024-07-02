@@ -40,6 +40,7 @@ class Weather:
 
             for city in self.check_items:
                 code = self.city_map().get(city)
+                print(code)
                 url = f"http://i.tianqi.com/?c=code&id=27&py={code}"
                 soup = BeautifulSoup(requests.get(url, headers=headers).content, 'html.parser')
                 boxes = soup.find_all('div', class_='box')
@@ -64,10 +65,10 @@ class Weather:
                         weather_description = description_tag.find_all('p')[0].text.strip()
                         future_wind = description_tag.find_all('p')[1].text.strip()
                         future_icon_url = f"<img src='{future_weather.img['src']}' />"
-                        summary += f"{day} {temperature} {weather_description} {future_icon_url} {future_wind}\n"
+                        summary += f"{day} {temperature} {future_wind} {weather_description} {future_icon_url}\n"
 
-                    msg += f"{name} 今天\n{kalendar_date}\n{kalendar_date1}\n{path}{icon_url} {description} {wind}"
-                    msg += f"\n当前温度：{temp}，{humidity}\n{details}\n\n{summary}"
+                    msg += f"<b><span style='color: red'>{name} </span></b>今天\n{kalendar_date}\n{kalendar_date1}\n{path}{icon_url} {description} {wind}"
+                    msg += f"\n当前温度：{temp}\n{humidity}\n{details}\n\n{summary}"
                 msg += "\n"
         else:
             msg += f"请求失败\n"

@@ -4,71 +4,72 @@ cron: 50 7 * * *
 new Env('什么值得买APP');
 """
 
-import requests
 import json
 import time
 import hashlib
-from notify_mtr import send
+import requests
 from utils import get_data
+from notify_mtr import send
+
 
 class Smzdm:
     def __init__(self, check_items):
         self.check_items = check_items
-        self.headers = {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'smzdm_android_V11.0.17 rv:841 (22021211RC;Android12;zh)smzdmapp',
-        }
 
-    def get_token(self, cookie):
-        ts = int(round(time.time() * 1000))
-        url = 'https://user-api.smzdm.com/robot/token'
-        data = {
-            "time": ts,
-            "weixin": 1,
-            "f": "android",
-            "v": "11.0.17",
-            "sign": hashlib.md5(
-                f'f=android&time={ts}&v=11.0.17&weixin=1&key=apr1$AwP!wRRT$gJ/q.X24poeBInlUJC'.encode('utf-8')
-            ).hexdigest().upper()
-        }
-        response = requests.post(url=url, headers=self.headers, data=data, cookies={'Cookie': cookie})
-        token = response.json()['data']['token']
-        return token
-
-    def sign(self, cookie):
+    @staticmethod
+    def sign(cookie):
         try:
-            token = self.get_token(cookie)
             ts = int(round(time.time() * 1000))
-            data = {
-                "weixin": 1,
-                "f": "android",
-                "v": "11.0.17",
-                "token": token,
-                "time": ts,
-                "sk": "ierkM0OZZbsuBKLoAgQ6OJneLMXBQXmzX+LXkNTuKch8Ui2jGlahuFyWIzBiDq/L",
-                "sign": hashlib.md5(
-                    f'f=android&sk=ierkM0OZZbsuBKLoAgQ6OJneLMXBQXmzX+LXkNTuKch8Ui2jGlahuFyWIzBiDq/L&time={ts}&token={token}&v=11.0.17&weixin=1&key=apr1$AwP!wRRT$gJ/q.X24poeBInlUJC'.encode('utf-8')
-                ).hexdigest().upper()
+            url = 'https://user-api.smzdm.com/robot/token'
+            headers = {
+                'Cookie': cookie,
+                'Host': 'user-api.smzdm.com',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'User-Agent': 'smzdm_android_V10.4.1 rv:841 (22021211RC;Android12;zh)smzdmapp',
             }
-            url1 = 'https://user-api.smzdm.com/checkin'
-            url2 = 'https://user-api.smzdm.com/checkin/all_reward'
+            data = {
+                "f": "android",
+                "v": "10.4.1",
+                "weixin": 1,
+                "time": ts,
+                "sign": hashlib.md5(bytes(f'f=android&time={ts}&v=10.4.1&weixin=1&key=apr1$AwP!wRRT$gJ/q.X24poeBInlUJC', encoding='utf-8')).hexdigest().upper()
+            }
+            res = requests.post(url=url, headers=headers, data=data).json()
+            token = res['data']['token']
 
-            html1 = requests.post(url=url1, headers=self.headers, data=data, cookies={'Cookie': cookie})
-            html2 = requests.post(url=url2, headers=self.headers, data=data, cookies={'Cookie': cookie})
-            res1 = html1.json()
-            res2 = html2.json()
-
-            if res2['error_code'] == '0':
+            Timestamp = int(round(time.time() * 1000))
+            data = {
+                "f": "android",
+                "v": "10.4.1",
+                "weixin": 1,
+                "token": token,
+                "time": Timestamp,
+                "sk": "ierkM0OZZbsuBKLoAgQ6OJneLMXBQXmzX+LXkNTuKch8Ui2jGlahuFyWIzBiDq/L",
+                "sign": hashlib.md5(bytes(f'f=android&sk=ierkM0OZZbsuBKLoAgQ6OJneLMXBQXmzX+LXkNTuKch8Ui2jGlahuFyWIzBiDq/L&time={Timestamp}&token={token}&v=10.4.1&weixin=1&key=apr1$AwP!wRRT$gJ/q.X24poeBInlUJC', encoding='utf-8')).hexdigest().upper()
+            }
+            headers = {
+                'Cookie': cookie,
+                'Host': 'user-api.smzdm.com',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'User-Agent': 'smzdm_android_V10.4.1 rv:841 (22021211RC;Android12;zh)smzdmapp',
+            }
+            url = 'https://user-api.smzdm.com/checkin/all_reward'
+            res = requests.post(url=url, headers=headers, data=data).json()
+            if '签到成功' in res:
                 msg = (
-                    f"{res2['data']['normal_reward']['title']}\n"
-                    f"{res2['data']['normal_reward']['sub_title']}\n"
-                    f"{res2['data']['normal_reward']['reward_add']['title']}: "
-                    f"{res2['data']['normal_reward']['reward_add']['content']}"
+                    f"<b><span style='color: green'>{res['data']['normal_reward']['title']}</span></b>\n"
+                    f"{res['data']['normal_reward']['sub_title']}\n"
+                    f"{res['data']['normal_reward']['gift']['title']}: "
+                    f"{res['data']['normal_reward']['gift']['content_str']}\n"
+                    f"{res['data']['normal_reward']['reward_add']['title']}: "
+                    f"{res['data']['normal_reward']['reward_add']['content']}"
                 )
             else:
+                url = 'https://user-api.smzdm.com/checkin'
+                res = requests.post(url=url, headers=headers, data=data).json()
                 msg = (
-                    f"重复签到\n{res1['error_msg']}{res1['data']['daily_num']}天\n"
-                    f"金币{res1['data']['cgold']}"
+                    f"<b><span style='color: green'>今天已经签到过了</span></b>\n{res['error_msg']}{res['data']['daily_num']}天\n"
+                    f"金币{res['data']['cgold']}"
                 )
         except Exception as e:
             msg = f"签到状态: 签到失败\n错误信息: {e}，请重新获取 cookie"
@@ -78,7 +79,7 @@ class Smzdm:
         msg_all = ""
         for check_item in self.check_items:
             msg = self.sign(check_item.get("cookie"))
-            msg_all += msg + "\n\n"
+            msg_all += msg + "\n"
         return msg_all
 
 if __name__ == "__main__":

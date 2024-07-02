@@ -61,7 +61,7 @@ class News:
     def main(self):
         msg = ""
         try:
-            res = requests.get("https://news.topurl.cn/api").json()
+            res = requests.get("https://news.topurl.cn/api?count=20").json()
             if res.get("code") == 200:
                 data = res.get("data")
                 if data.get("weather"):

@@ -65,16 +65,16 @@ class Get:
                 sign_button = driver.find_element(By.CLASS_NAME, "usercheck")
 
                 if '已签到' in sign_button.text:
-                    result += f'今天已经签到，{assets}'
+                    result += f"<b><span style='color: green'>今天已经签到</span></b>\n{assets}"
                 else:
                     try:
                         sign_button.click()
                         sleep(3)
                         driver.refresh()
                         assets = driver.find_element(By.CLASS_NAME, 'erphpdown-sc-table').text
-                        result = f'签到成功，{assets}'
+                        result = f"<b><span style='color: green'>签到成功</span></b>\n{assets}"
                     except TimeoutException:
-                        result = '签到失败'
+                        result = "<b><span style='color: red'>签到失败</span></b>"
                     except Exception as e:
                         result = f'发生异常：{str(e)}'
             else:
