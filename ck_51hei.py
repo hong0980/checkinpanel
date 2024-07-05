@@ -26,11 +26,9 @@ class nasyun:
         try:
             response = session.get(url, headers=headers, timeout=10)
             if '退出' in response.text:
-                xi1 = re.findall("<em> 黑币: </em>(.*?) &nbsp;", response.text)[0]
-                devote = re.findall("<li><em> 威望: </em>(.*?) </li>", response.text)[0]
-                active = re.findall("<li><em> 贡献: </em>(.*?) </li>", response.text)[0]
-                point = re.findall("<em>积分: </em>(.*?) <span", response.text)[0]
-                res += f"黑币：{xi1}\n积分：{point}\n威望：{devote}\n贡献：{active}"
+                pattern = r'<em>\s*(黑币|威望|积分|贡献):\s*</em>(\d+)'
+                matches = re.findall(pattern, response.text)
+                res = ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
             else:
                 res = 'cookie失效'
 

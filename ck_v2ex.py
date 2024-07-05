@@ -52,22 +52,24 @@ class V2ex:
 
             if '创作新主题' in driver.page_source:
                 driver.get('https://www.v2ex.com/mission/daily')
-                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'super')))
-                sign_button = driver.find_element(By.CLASS_NAME, 'super')
+                sign_button = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, '.super.normal.button'))
+                )
                 result = "<b><span style='color: green'>今天已经签到</span></b>\n"
                 if '领取' in sign_button.get_attribute('value'):
                     sign_button.click()
                     driver.refresh()
-                    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'super')))
-                    sign_button = driver.find_element(By.CLASS_NAME, 'super')
+                    sign_button = WebDriverWait(driver, 10).until(
+                        EC.element_to_be_clickable((By.CSS_SELECTOR, '.super.normal.button'))
+                    )
                     result = "<b><span style='color: green'>签到成功</span></b>\n"
 
-                cell = driver.find_element(By.XPATH, '//div[@id="Main"]/div[2]/div[3]').text
+                cell = driver.find_element(By.CSS_SELECTOR, '#Main > div.box > div:nth-child(3)').text
                 sign_button.click()
                 driver.refresh()
                 gray = driver.find_element(By.CSS_SELECTOR, 'table.data td span.gray').text.strip()
                 money = driver.find_element(By.XPATH, '//*[@id="Main"]/div[2]/div[4]/table/tbody/tr[2]/td[4]').text
-                result += f"{gray}\n{cell}\n余额：{money} 铜币"
+                result += f"{cell}\n{gray}\n余额：{money} 铜币"
             else:
                 result += '无法登录！可能Cookie失效，请重新修改'
 

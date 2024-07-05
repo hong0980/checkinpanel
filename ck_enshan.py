@@ -15,30 +15,26 @@ class Enshan:
 
     @staticmethod
     def sign(cookie):
-        res = ''
+        res = ""
+        session = requests.session()
+        u = "https://www.right.com.cn/forum/home.php?mod=spacecp&ac=credit&showcredit=1"
         headers = {
             "Cookie": cookie,
-            "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; WOW64) "
-                           "AppleWebKit/537.36 (KHTML, like Gecko) "
-                           "Chrome/102.0.0.0 Safari/537.36"),
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/102.0.0.0 Safari/537.36",
         }
-        session = requests.session()
         try:
-            r = session.get('https://www.right.com.cn/forum/forum.php', headers=headers, timeout=10)
-            if r.status_code == 200:
-                try:
-                    if '退出' in r.text:
-                        url = "https://www.right.com.cn/forum/home.php?mod=spacecp&ac=credit&showcredit=1"
-                        response = session.get(url, headers=headers, timeout=10)
-                        coin = re.findall("恩山币: </em>(.*?) 币 &nbsp", response.text)[0]
-                        point = re.findall("<em>积分: </em>(.*?) <span", response.text)[0]
-                        res += f"恩山币：{coin}\n积分：{point}"
-                    else:
-                        res += 'cookie失效'
-                except Exception as e:
-                    res = f"发生异常: {e}"
+            r = session.get(u, headers=headers, timeout=10)
+            if '退出' in r.text:
+                pattern = r'<em>\s*(恩山币|积分|贡献):\s*</em>(\d+)'
+                matches = re.findall(pattern, r.text)
+                res = ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
             else:
-                res += '请求没有响应'
+                res = 'cookie失效'
+
+        except Exception as e:
+            res = f"发生异常: {e}"
         except requests.RequestException as e:
             res = f"请求发生错误: {e}"
         return res
@@ -48,7 +44,7 @@ class Enshan:
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = str(check_item.get("cookie"))
             msg = f"---- 账号({i})恩山论坛 签到结果 ----\n{self.sign(cookie)}"
-            msg_all += msg + "\n\n"
+            msg_all += msg + "\n"
         return msg_all
 
 if __name__ == "__main__":

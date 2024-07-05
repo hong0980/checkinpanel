@@ -20,7 +20,6 @@ class Get:
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.common.exceptions import NoSuchElementException, TimeoutException
-        result = ''
         options = webdriver.ChromeOptions()
         options.add_argument('--headless')  # 无头模式
         options.add_argument('--no-sandbox')
@@ -45,42 +44,53 @@ class Get:
         )
 
         try:
+            result = ''
             driver.get('https://www.ypojie.com/vip')
-            sleep(3)
-            # 找到用户名和密码输入框并输入用户名和密码
-            username_input = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "user_login")))
+            sleep(2)
+            username_input = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.ID, "user_login"))
+            )
             username_input.send_keys(username)
             sleep(1)
-            password_input = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "user_pass")))
+            password_input = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.ID, "user_pass"))
+            )
             password_input.send_keys(password)
             sleep(1)
             # 找到登录按钮并点击
-            login_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "wp-submit")))
+            login_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.ID, "wp-submit"))
+            )
             login_button.click()
-            sleep(1)
+
+            if '登录 ‹ 易破解' in driver.page_source:
+                return '登录不成功，用户名或密码可能错误。'
+
             driver.get('https://www.ypojie.com/vip')
+            sign_button = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, '.usercheck.erphpdown-sc-btn.active'))
+            )
 
-            if '我的资产' in driver.page_source:
-                assets = driver.find_element(By.CLASS_NAME, 'erphpdown-sc-table').text
-                sign_button = driver.find_element(By.CLASS_NAME, "usercheck")
-
-                if '已签到' in sign_button.text:
-                    result += f"<b><span style='color: green'>今天已经签到</span></b>\n{assets}"
-                else:
-                    try:
-                        sign_button.click()
-                        sleep(3)
-                        driver.refresh()
-                        assets = driver.find_element(By.CLASS_NAME, 'erphpdown-sc-table').text
-                        result = f"<b><span style='color: green'>签到成功</span></b>\n{assets}"
-                    except TimeoutException:
-                        result = "<b><span style='color: red'>签到失败</span></b>"
-                    except Exception as e:
-                        result = f'发生异常：{str(e)}'
+            if '已签到' in sign_button.text:
+                result = f"<b><span style='color: green'>今天已经签到</span></b>\n"       
             else:
-                result = '用户名或密码出错，不能登录'
+                try:
+                    sign_button.click()
+                    sleep(2)
+                    driver.refresh()
+                    result = f"<b><span style='color: green'>签到成功</span></b>\n"
+                except NoSuchElementException as e:
+                    return f"<b><span style='color: red'>签到失败</span></b>\n{e}"
+
+            assets = driver.find_element(By.CLASS_NAME, 'erphpdown-sc-table').text
+            result += f'{assets}'
+
+        except TimeoutException as e:
+            result = f'等待超时：{e}'
+        except NoSuchElementException as e:
+            result = f'发生异常：{e}'
         except Exception as e:
-            result += f'发生异常：{str(e)}'
+            result = f'发生异常：{e}'
         finally:
             driver.quit()
         return result

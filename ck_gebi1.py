@@ -3,6 +3,7 @@
 cron: 0 0 * * *
 new Env('隔壁网 签到');
 """
+
 import re
 import requests
 from time import sleep
@@ -16,10 +17,10 @@ class gebi1:
 
     @staticmethod
     def sign(cookie):
-        res = ""
+        res = []
         session = requests.session()
         url = 'https://www.gebi1.com/plugin.php?id=k_misign:sign'
-        qd_url = 'https://www.gebi1.com/plugin.php?id=k_misign:sign&operation=qiandao&formhash=188fd2da&format=empty'
+        credit = 'https://www.gebi1.com/home.php?mod=spacecp&ac=credit'
         headers = {
             "Cookie": cookie,
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) "
@@ -29,33 +30,52 @@ class gebi1:
 
         def parse_sign_info(soup):
             lxdays = soup.select_one('#lxdays')['value']
+            lxtdays = soup.select_one('#lxtdays')['value']
             lxlevel = soup.select_one('#lxlevel')['value']
             lxreward = soup.select_one('#lxreward')['value']
-            lxtdays = soup.select_one('#lxtdays')['value']
             qiandaobtnnum = soup.select_one('#qiandaobtnnum')['value']
-            return lxdays, lxlevel, lxreward, lxtdays, qiandaobtnnum
+            res = (
+                f'签到排名：{qiandaobtnnum}\n'
+                f'连续签到：{lxdays} 天\n'
+                f'签到等级：LV.{lxlevel}\n'
+                f'积分奖励：{lxreward} 条丝瓜\n'
+                f'累计签到：{lxtdays} 天'
+            )
+
+            response = session.get(credit, headers=headers, timeout=10)
+            pattern = r'<em>\s*(丝瓜|经验值|积分|贡献):\s*</em>(\d+)'
+            matches = re.findall(pattern, response.text)
+            res += '\n\n<b>我的积分:</b>\n' + ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
+
+            return res
 
         try:
-            response = session.get(url, headers=headers, timeout=10)
-            soup = BeautifulSoup(response.text, "html.parser")
-            if '注册' in response.text:
-                res += 'cookie失效'
+            r = session.get(url, headers=headers, timeout=10)
+            soup = BeautifulSoup(r.text, "html.parser")
+            if '注册' in r.text:
+                return 'cookie失效'
+
+            sign_href = soup.find('a', id='JD_sign')
+            if sign_href:
+                sign_link = 'https://www.gebi1.com/' + sign_href.get('href')
+                session.get(sign_link, headers=headers, timeout=10)
+                sleep(2)
+                r = session.get(url, headers=headers, timeout=10)
+                soup = BeautifulSoup(r.text, "html.parser")
+                res.append(f"<b><span style='color: green'>签到成功</span></b>\n{parse_sign_info(soup)}")
             else:
-                if '您今天还没有签到' in response.text:
-                    session.get(qd_url, headers=headers, timeout=10)
-                    sleep(2)
-                    response = session.get(url, headers=headers, timeout=10)
-                    soup = BeautifulSoup(response.text, "html.parser")
-                    lxdays, lxlevel, lxreward, lxtdays, qiandaobtnnum = parse_sign_info(soup)
-                    res += f"签到成功\n签到排名：{qiandaobtnnum}\n连续签到：{lxdays}\n签到等级：{lxlevel}\n积分奖励：{lxreward}\n总天数：{lxtdays}"
-                else:
-                    lxdays, lxlevel, lxreward, lxtdays, qiandaobtnnum = parse_sign_info(soup)
-                    res += f"今日已签到\n签到排名：{qiandaobtnnum}\n连续签到：{lxdays}\n签到等级：{lxlevel}\n积分奖励：{lxreward}\n总天数：{lxtdays}"
+                res.append(f"<b><span style='color: green'>今日已签到</span></b>\n{parse_sign_info(soup)}")
+
+        except requests.Timeout:
+            res.append("签到失败: 请求超时")
         except requests.RequestException as e:
-            res += f"网络请求异常: {str(e)}"
+            res.append(f"签到失败: 网络请求异常 - {str(e)}")
+        except AttributeError as e:
+            res.append(f"签到失败: 属性错误 - {str(e)}")
         except Exception as e:
-            res += f"发生异常: {str(e)}"
-        return res
+            res.append(f"签到失败: {str(e)}")
+
+        return '\n'.join(res)
 
     def main(self):
         msg_all = ""
