@@ -29,7 +29,7 @@ class V2ex:
         service = webdriver.ChromeService(
             log_output='/tmp/v2ex.log',
             executable_path='/usr/bin/chromedriver',
-            service_args=['--readable-timestamp', '--disable-build-check']
+            service_args=['--readable-timestamp']
         )
 
         driver = webdriver.Chrome(service=service, options=options)
@@ -43,44 +43,38 @@ class V2ex:
         )
 
         try:
-            result = ''
-            driver.get('https://www.v2ex.com/')
+            driver.get('https://www.v2ex.com/signin')
             for single_cookie in cookie.split('; '):
                 name, value = single_cookie.split('=', 1)
                 driver.add_cookie({'name': name, 'value': value})
-            driver.refresh()
+            driver.get('https://www.v2ex.com/mission/daily')
 
-            if '创作新主题' in driver.page_source:
-                driver.get('https://www.v2ex.com/mission/daily')
+            if '日常任务' in driver.page_source:
                 sign_button = WebDriverWait(driver, 10).until(
                     EC.element_to_be_clickable((By.CSS_SELECTOR, '.super.normal.button'))
                 )
-                result = "<b><span style='color: green'>今天已经签到</span></b>\n"
-                if '领取' in sign_button.get_attribute('value'):
+                result = "<b><span style='color: green'>今天已经签到</span></b>"
+                if '领取 X 铜币' in sign_button.get_attribute('value'):
                     sign_button.click()
                     driver.refresh()
-                    sign_button = WebDriverWait(driver, 10).until(
-                        EC.element_to_be_clickable((By.CSS_SELECTOR, '.super.normal.button'))
-                    )
-                    result = "<b><span style='color: green'>签到成功</span></b>\n"
+                    result = "<b><span style='color: green'>签到成功</span></b>"
 
                 cell = driver.find_element(By.CSS_SELECTOR, '#Main > div.box > div:nth-child(3)').text
-                sign_button.click()
-                driver.refresh()
+                driver.get('https://www.v2ex.com/balance')
                 gray = driver.find_element(By.CSS_SELECTOR, 'table.data td span.gray').text.strip()
-                money = driver.find_element(By.XPATH, '//*[@id="Main"]/div[2]/div[4]/table/tbody/tr[2]/td[4]').text
-                result += f"{cell}\n{gray}\n余额：{money} 铜币"
+                money = driver.find_element(By.XPATH, '//*[@id="Main"]/div[2]/div[4]/table/tbody/tr[2]/td[4]').text.strip()
+                result += f"\n{cell}\n余额：{money} 铜币\n{gray}"
             else:
-                result += '无法登录！可能Cookie失效，请重新修改'
+                return '无法登录！可能Cookie失效，请重新修改'
 
         except TimeoutException as e:
-            result += f"<b><span style='color: red'>超时异常：</span></b>\n{e}"
+            result = f"<b><span style='color: red'>超时异常：</span></b>\n{e}"
         except NoSuchElementException as e:
-            result += f"<b><span style='color: red'>签到失败：</span></b>\n{e}"
+            result = f"<b><span style='color: red'>签到失败：</span></b>\n{e}"
         except WebDriverException as e:
-            result += f"<b><span style='color: red'>WebDriver异常：</span></b>\n{e}"
+            result = f"<b><span style='color: red'>WebDriver异常：</span></b>\n{e}"
         except Exception as e:
-            result += f"<b><span style='color: red'>未知异常：</span></b>\n{e}"
+            result = f"<b><span style='color: red'>未知异常：</span></b>\n{e}"
 
         finally:
             # driver.get('https://bot.sannysoft.com/')

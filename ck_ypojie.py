@@ -30,7 +30,7 @@ class Get:
         service = webdriver.ChromeService(
             log_output='/tmp/ypojie.log',
             executable_path='/usr/bin/chromedriver',
-            service_args=['--readable-timestamp', '--disable-build-check']
+            service_args=['--readable-timestamp']
         )
 
         driver = webdriver.Chrome(service=service, options=options)
@@ -44,35 +44,24 @@ class Get:
         )
 
         try:
-            result = ''
-            driver.get('https://www.ypojie.com/vip')
-            sleep(2)
-            username_input = WebDriverWait(driver, 10).until(
+            url = 'https://www.ypojie.com/vip'
+            driver.get(url)
+            WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.ID, "user_login"))
-            )
-            username_input.send_keys(username)
-            sleep(1)
-            password_input = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.ID, "user_pass"))
-            )
-            password_input.send_keys(password)
-            sleep(1)
-            # 找到登录按钮并点击
-            login_button = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.ID, "wp-submit"))
-            )
-            login_button.click()
+            ).send_keys(username)
+            driver.find_element(By.ID, "user_pass").send_keys(password)
+            driver.find_element(By.ID, "wp-submit").click()
 
             if '登录 ‹ 易破解' in driver.page_source:
                 return '登录不成功，用户名或密码可能错误。'
 
-            driver.get('https://www.ypojie.com/vip')
+            driver.get(url)
             sign_button = WebDriverWait(driver, 5).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, '.usercheck.erphpdown-sc-btn.active'))
+                EC.element_to_be_clickable((By.CSS_SELECTOR, '.usercheck.erphpdown-sc-btn'))
             )
 
             if '已签到' in sign_button.text:
-                result = f"<b><span style='color: green'>今天已经签到</span></b>\n"       
+                result = f"<b><span style='color: green'>今天已经签到</span></b>\n"
             else:
                 try:
                     sign_button.click()

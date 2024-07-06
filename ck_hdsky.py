@@ -22,11 +22,10 @@ class Get:
             r = session.get(url + 'torrents.php', headers={"Cookie": cookie}, timeout=10)
             if "欢迎回来" in r.text:
                 movie_info = f'<b>（2）当前最新的{Movies_quantity}部信息：</b>\n'
-                r_soup = BeautifulSoup(r.text, "html.parser")
-                Movieslist = r_soup.find_all('tr', class_='stickbg progresstr')
+                soup = BeautifulSoup(r.text, "html.parser")
+                user_name = soup.find('a', class_='InsaneUser_Name').find('b').text
+                Movieslist = soup.find_all('tr', class_='stickbg progresstr')
                 for i, info in enumerate(Movieslist[:int(Movies_quantity)], start=1):
-                    douban_msg = '<b>豆瓣信息：</b>\n'
-                    name = info.find('a', title=True)['title']
                     for element in info.find_all('td', class_='embedded'):
                         spans = element.find_all('span')
                         if spans:
@@ -37,27 +36,28 @@ class Get:
                             else:
                                 remaining = ' '.join([span.text for span in spans[1:-1]])
 
-                    category = info.img.get('title')
-                    upload_time = info.find_all('td', class_='rowfollow nowrap')[1].find('span')['title']
-                    movie_link = info.find('a', title=True)['href']
-                    
-                    if movie_link:
-                        d = session.get(url + movie_link, headers={"Cookie": cookie}, timeout=10)
-                        d_soup = BeautifulSoup(d.text, 'html.parser')
-                        if '<td class="rowhead">豆瓣' in d.text:
-                            for element in d_soup.find_all('dl', id='dbdl'):
-                                for dt in element.find_all('dt'):
-                                    key = dt.get_text(strip=True)
-                                    dd = dt.find_next_sibling('dd')
-                                    value = dd.get_text(strip=True) if dd else ''
-                                    douban_msg += f"【<span style='color: #FE830F'>  {key}  </span>】：{value}\n"
-                    else:
-                        douban_msg += ""
-
                     imdb_element = info.find('img', src="/pic/icon-imdb.png")
                     douban_element = info.find('img', src="/pic/icon-douban.png")
                     imdb_rating = imdb_element.find_next_sibling(string=True).strip() if imdb_element else ''
                     douban_rating = douban_element.find_next_sibling(string=True).strip() if douban_element else ''
+
+                    douban_msg = ''
+                    if douban_rating:
+                        movie_link = info.find('a', title=True)['href']
+                        d = session.get(url + movie_link, headers={"Cookie": cookie}, timeout=10)
+                        douban_soup = BeautifulSoup(d.text, 'html.parser')
+                        if '<td class="rowhead">豆瓣' in d.text:
+                            for element in douban_soup.find_all('dl', id='dbdl'):
+                                for dt in element.find_all('dt'):
+                                    key = dt.get_text(strip=True)
+                                    dd = dt.find_next_sibling('dd')
+                                    value = dd.get_text(strip=True) if dd else ''
+                                    douban_msg = ('<b>豆瓣信息：</b>\n'
+                                                 f"【<span style='color: #FE830F'>  {key}  </span>】：{value}\n")
+
+                    category = info.img.get('title')
+                    name = info.find('a', title=True)['title']
+                    upload_time = info.find_all('td', class_='rowfollow nowrap')[1].find('span')['title']
 
                     td_tags = info.find_all('td', class_='rowfollow')
                     data = [td.get_text(strip=True) for td in td_tags]
@@ -76,13 +76,12 @@ class Get:
                                        f"【 <span style='color: magenta'>种子数</span> 】: {seeders}\n"
                                        f"【 <span style='color: magenta'>下载数</span> 】: {leechers}\n"
                                        f"【 <span style='color: magenta'>完成数</span> 】: {snatched}\n"
-                                       f"{douban_msg}\n")
+                                       f"{douban_msg}")
 
                 bonus = re.findall(r"使用.*?:(.*)\s*<font", r.text)[0].strip()
                 ratio = re.findall(r"分享率.*?> (.*).*?<f", r.text)[0].strip()
                 uploaded = re.findall(r"上传量.*?> (.*).*?<f", r.text)[0].strip()
                 downloaded = re.findall(r"下载量.*?> (.*).*?<f", r.text)[0].strip()
-                user_name = r_soup.find('a', class_='InsaneUser_Name').find('b').text
                 active = re.findall(r"trans.gif\"/>(\d+).*?arrowdown", r.text)[0].strip()
                 res += (f"<b>（1）账户信息：</b>\n"
                         f"用户名：{user_name}\n"
@@ -94,8 +93,8 @@ class Get:
                         f"{movie_info}")
             else:
                 res = "登录失败，请检查Cookie或网络连接。"
-        # except requests.RequestException as e:
-        #     res += f"请求异常: {e}"
+        except requests.RequestException as e:
+            res = f"请求异常: {e}"
 
         except Exception as e:
             res = f"出现错误: {e}"
@@ -105,10 +104,10 @@ class Get:
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = check_item.get("cookie")
-            Movies_quantity = check_item.get("Movies_quantity")
-            sign_msg = self.sign(cookie, Movies_quantity)
+            quantity = check_item.get("Movies_quantity")
+            sign_msg = self.sign(cookie, quantity)
             msg = f"{sign_msg}"
-            msg_all += msg + "\n\n"
+            msg_all += msg + "\n"
         return msg_all
 
 if __name__ == "__main__":
