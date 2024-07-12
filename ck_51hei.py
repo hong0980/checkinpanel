@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 4 0 * * *
+cron: 3 0 * * *
 new Env('51黑电子论坛 签到');
 """
 import re
@@ -14,7 +14,6 @@ class nasyun:
 
     @staticmethod
     def sign(cookie):
-        res = ""
         session = requests.session()
         url = 'http://www.51hei.com/bbs/home.php?mod=spacecp&ac=credit&op=base'
         headers = {
@@ -24,17 +23,15 @@ class nasyun:
             "Chrome/102.0.0.0 Safari/537.36",
         }
         try:
-            response = session.get(url, headers=headers, timeout=10)
-            if '退出' in response.text:
-                pattern = r'<em>\s*(黑币|威望|积分|贡献):\s*</em>(\d+)'
-                matches = re.findall(pattern, response.text)
-                res = ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
-            else:
-                res = 'cookie失效'
+            r = session.get(url, headers=headers, timeout=10)
+            if '用户登录' in r.text:
+                return 'cookie失效'
+            pattern = r'<em>\s*(黑币|威望|积分|贡献):\s*</em>(\d+)'
+            matches = re.findall(pattern, r.text)
+            return ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
 
         except Exception as e:
-            res = f"发生异常: {e}"
-        return res
+            return f"发生异常: {e}"
 
     def main(self):
         msg_all = ""

@@ -3,9 +3,10 @@
 cron: 10 11 * * *
 new Env('V2EX');
 """
-
+import re
 from utils import get_data
 from notify_mtr import send
+from datetime import datetime
 
 class V2ex:
     def __init__(self, check_items):
@@ -43,38 +44,40 @@ class V2ex:
         )
 
         try:
+            res = "<b><span style='color: green'>今天已经签到过了</span></b>"
             driver.get('https://www.v2ex.com/signin')
             for single_cookie in cookie.split('; '):
                 name, value = single_cookie.split('=', 1)
                 driver.add_cookie({'name': name, 'value': value})
             driver.get('https://www.v2ex.com/mission/daily')
-
-            if '日常任务' in driver.page_source:
-                sign_button = WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, '.super.normal.button'))
-                )
-                result = "<b><span style='color: green'>今天已经签到</span></b>"
-                if '领取 X 铜币' in sign_button.get_attribute('value'):
-                    sign_button.click()
-                    driver.refresh()
-                    result = "<b><span style='color: green'>签到成功</span></b>"
-
-                cell = driver.find_element(By.CSS_SELECTOR, '#Main > div.box > div:nth-child(3)').text
-                driver.get('https://www.v2ex.com/balance')
-                gray = driver.find_element(By.CSS_SELECTOR, 'table.data td span.gray').text.strip()
-                money = driver.find_element(By.XPATH, '//*[@id="Main"]/div[2]/div[4]/table/tbody/tr[2]/td[4]').text.strip()
-                result += f"\n{cell}\n余额：{money} 铜币\n{gray}"
-            else:
+            if '注册' in driver.page_source:
                 return '无法登录！可能Cookie失效，请重新修改'
 
+            sign_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, '//input[@type="button"]'))
+            )
+            if '领取 X 铜币' in sign_button.get_attribute('value'):
+                sign_button.click()
+                res = "<b><span style='color: green'>签到成功</span></b>"
+
+            sign_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//input[@value='查看我的账户余额']"))
+            )
+            cell = re.findall(r'>(已连续登录.*?天)<', driver.page_source)[0]
+            sign_button.click()
+            formatted_date = datetime.now().strftime('%Y%m%d')
+            gray = re.findall(f'{formatted_date}\s*的(每日登录奖励.*?)</span>', driver.page_source)
+            money = driver.find_element(By.CSS_SELECTOR, "#money .balance_area").text.replace('\n', '').strip()
+            res += f"\n{cell}\n{gray[0]}\n当前账户余额：{money} 铜币"
+
         except TimeoutException as e:
-            result = f"<b><span style='color: red'>超时异常：</span></b>\n{e}"
+            res = f"<b><span style='color: red'>超时异常：</span></b>\n{e}"
         except NoSuchElementException as e:
-            result = f"<b><span style='color: red'>签到失败：</span></b>\n{e}"
+            res = f"<b><span style='color: red'>签到失败：</span></b>\n{e}"
         except WebDriverException as e:
-            result = f"<b><span style='color: red'>WebDriver异常：</span></b>\n{e}"
+            res = f"<b><span style='color: red'>WebDriver异常：</span></b>\n{e}"
         except Exception as e:
-            result = f"<b><span style='color: red'>未知异常：</span></b>\n{e}"
+            res = f"<b><span style='color: red'>未知异常：</span></b>\n{e}"
 
         finally:
             # driver.get('https://bot.sannysoft.com/')
@@ -82,7 +85,7 @@ class V2ex:
             # driver.set_window_size(1920, total_height)
             # driver.save_screenshot('/tmp/screenshot.png')
             driver.quit()
-        return result
+        return res
 
     def main(self):
         msg_all = ""

@@ -72,7 +72,7 @@ class News:
                 if data.get("newsList"):
                     msg += "📮 每日新闻 📮\n"
                     for no, news_ in enumerate(data.get("newsList"), start=1):
-                        msg += f'{str(no).zfill(2)}. <a href="{news_.get("url")}">{news_.get("title")}</a>\n'
+                        msg += f'{str(no).zfill(2)}({news_.get("category")}). <a href="{news_.get("url")}">{news_.get("title")}</a>\n'
                 if data.get("historyList"):
                     msg += "\n🎬 历史上的今天 🎬\n"
                     for history in data.get("historyList"):

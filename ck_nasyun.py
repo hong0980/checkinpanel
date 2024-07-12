@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 4 0 * * *
+cron: 3 0 * * *
 new Env('那是云 签到');
 """
 import re
@@ -14,7 +14,6 @@ class nasyun:
 
     @staticmethod
     def sign(cookie):
-        res = ""
         session = requests.session()
         url = 'http://www.nasyun.com/home.php?mod=spacecp&ac=credit&op=base'
         headers = {
@@ -24,23 +23,20 @@ class nasyun:
             "Chrome/102.0.0.0 Safari/537.36",
         }
         try:
-            response = session.get(url, headers=headers, timeout=10)
-            if '我的' in response.text:
-                devote = re.findall("<li><em> 贡献: </em>(.*?) </li>", response.text)[0]
-                active = re.findall("<li><em> 活跃: </em>(.*?) </li>", response.text)[0]
-                point = re.findall("<em>积分: </em>(.*?) <span", response.text)[0]
-                res += f"贡献：{devote}\n活跃：{active}\n积分：{point}"
-            else:
-                res += 'cookie失效'
+            r = session.get(url, headers=headers, timeout=10)
+            if '立即注册' in r.text:
+                return 'cookie失效'
+            pattern = r'<em>\s*(云币|贡献|活跃|积分):\s*</em>(\d+)'
+            matches = re.findall(pattern, r.text)
+            return ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
         except Exception as e:
-            res += f"发生异常: {e}"
-        return res
+            return f"发生异常: {e}"
 
     def main(self):
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = str(check_item.get("cookie"))
-            msg = f"---- 账号({i})那是云签到结果 ----\n{self.sign(cookie)}"
+            msg = f"---- 账号({i}) 那是云 签到结果 ----\n{self.sign(cookie)}"
             msg_all += msg + "\n\n"
         return msg_all
 

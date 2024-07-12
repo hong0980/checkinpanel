@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 5 0 * * *
+cron: 3 0 * * *
 new Env('在线工具');
 """
 
@@ -21,14 +21,21 @@ class ToolLu:
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/102.0.0.0 Safari/537.36",
         }
-        response = requests.get('https://id.tool.lu/sign', headers=headers)
-        creditsresponse = requests.get('https://id.tool.lu/credits', headers=headers)
-        day = re.findall("你已经连续签到(.*)，再接再厉！", response.text)
-        credits= re.findall('<span class="badge bg-warning">(.*)</span>', creditsresponse.text)[0].replace(" ", "")
-        if len(day) == 0:
-            return "cookie 失效"
-        day = day[0].replace(" ", "")
-        return f"连续签到 {day}, 当前积分:{credits}"
+
+        try:
+            with requests.Session() as session:
+                r = session.get('https://id.tool.lu/sign', headers=headers)
+                if '再接再厉' not in r.text:
+                    return "cookie 失效"
+                day = re.findall(r'>(.*?你已经连续签到.*?)<', r.text)[0]
+
+                c = session.get('https://id.tool.lu/credits', headers=headers)
+                credits = re.findall(r'<p class="text-xl pb-1">(.*?)<span class="badge bg-warning">(.*?)</span></p>', c.text)[0]
+
+                return f"{day}\n{credits[0]}{credits[1]}"
+        
+        except requests.RequestException as e:
+            return f"请求出错: {e}"
 
     def main(self):
         msg_all = ""
@@ -37,7 +44,6 @@ class ToolLu:
             msg = f"---- 账号({i})在线工具签到结果 ----\n{self.sign(cookie)}"
             msg_all += msg + "\n\n"
         return msg_all
-
 
 if __name__ == "__main__":
     _data = get_data()

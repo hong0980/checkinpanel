@@ -44,11 +44,13 @@ class Get:
         )
 
         try:
+            res = ''
             url = 'https://www.ypojie.com/vip'
             driver.get(url)
-            WebDriverWait(driver, 10).until(
+            user_login = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.ID, "user_login"))
-            ).send_keys(username)
+            )
+            user_login.send_keys(username)
             driver.find_element(By.ID, "user_pass").send_keys(password)
             driver.find_element(By.ID, "wp-submit").click()
 
@@ -61,28 +63,28 @@ class Get:
             )
 
             if '已签到' in sign_button.text:
-                result = f"<b><span style='color: green'>今天已经签到</span></b>\n"
+                res = f"<b><span style='color: green'>今天已经签到</span></b>\n"
             else:
                 try:
                     sign_button.click()
                     sleep(2)
                     driver.refresh()
-                    result = f"<b><span style='color: green'>签到成功</span></b>\n"
-                except NoSuchElementException as e:
-                    return f"<b><span style='color: red'>签到失败</span></b>\n{e}"
+                    res = f"<b><span style='color: green'>签到成功</span></b>\n"
+                except Exception as e:
+                    res = f"<b><span style='color: red'>签到失败</span></b>\n{e}"
 
             assets = driver.find_element(By.CLASS_NAME, 'erphpdown-sc-table').text
-            result += f'{assets}'
+            res += assets
 
         except TimeoutException as e:
-            result = f'等待超时：{e}'
+            res = f'等待超时：{e}'
         except NoSuchElementException as e:
-            result = f'发生异常：{e}'
+            res = f'发生异常：{e}'
         except Exception as e:
-            result = f'发生异常：{e}'
+            res = f'发生异常：{e}'
         finally:
             driver.quit()
-        return result
+        return res
 
     def main(self):
         msg_all = ""
