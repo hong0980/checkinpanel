@@ -13,7 +13,7 @@ class V2ex:
         self.check_items = check_items
 
     @staticmethod
-    def sign(cookie):
+    def sign(cookie, i):
         from selenium import webdriver
         from selenium_stealth import stealth
         from selenium.webdriver.common.by import By
@@ -43,22 +43,27 @@ class V2ex:
             renderer="Intel Iris OpenGL Engine",
         )
 
+        res = ''
         try:
-            res = "<b><span style='color: green'>今天已经签到过了</span></b>"
             driver.get('https://www.v2ex.com/signin')
             for single_cookie in cookie.split('; '):
                 name, value = single_cookie.split('=', 1)
                 driver.add_cookie({'name': name, 'value': value})
             driver.get('https://www.v2ex.com/mission/daily')
             if '注册' in driver.page_source:
-                return '无法登录！可能Cookie失效，请重新修改'
+                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
+
+            name = driver.find_element(By.XPATH, '//span[@class="bigger"]')
+            msg = f"---- 账号({name.text}) V2EX 签到状态 ----\n"
 
             sign_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, '//input[@type="button"]'))
             )
+
+            res = f"{msg}<b><span style='color: green'>今天已经签到过了</span></b>"
             if '领取 X 铜币' in sign_button.get_attribute('value'):
                 sign_button.click()
-                res = "<b><span style='color: green'>签到成功</span></b>"
+                res = f"{msg}<<b><span style='color: green'>签到成功</span></b>"
 
             sign_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, "//input[@value='查看我的账户余额']"))
@@ -91,8 +96,8 @@ class V2ex:
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = check_item.get("cookie")
-            msg = f"---- 账号({i})V2EX 签到状态 ----\n{self.sign(cookie)}"
-            msg_all += msg + "\n"
+            msg = self.sign(cookie, i)
+            msg_all += msg + "\n\n"
         return msg_all
 
 if __name__ == "__main__":

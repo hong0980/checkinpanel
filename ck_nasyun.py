@@ -13,7 +13,7 @@ class nasyun:
         self.check_items = check_items
 
     @staticmethod
-    def sign(cookie):
+    def sign(cookie, i):
         session = requests.session()
         url = 'http://www.nasyun.com/home.php?mod=spacecp&ac=credit&op=base'
         headers = {
@@ -25,18 +25,22 @@ class nasyun:
         try:
             r = session.get(url, headers=headers, timeout=10)
             if '立即注册' in r.text:
-                return 'cookie失效'
+                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
+
+            name = re.findall(r'<a.*?\.html" target="_blank">(.*?)</a>', r.text, re.DOTALL)
+            res = f"---- 账号({name[0]}) 那是云 签到结果 ----\n"
             pattern = r'<em>\s*(云币|贡献|活跃|积分):\s*</em>(\d+)'
             matches = re.findall(pattern, r.text)
-            return ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
+            res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
         except Exception as e:
             return f"发生异常: {e}"
+        return res
 
     def main(self):
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = str(check_item.get("cookie"))
-            msg = f"---- 账号({i}) 那是云 签到结果 ----\n{self.sign(cookie)}"
+            msg = self.sign(cookie, i)
             msg_all += msg + "\n\n"
         return msg_all
 

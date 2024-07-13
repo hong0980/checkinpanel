@@ -14,7 +14,7 @@ class Enshan:
         self.check_items = check_items
 
     @staticmethod
-    def sign(cookie):
+    def sign(cookie, i):
         res = ""
         session = requests.session()
         u = "https://www.right.com.cn/forum/home.php?mod=spacecp&ac=credit&showcredit=1"
@@ -27,11 +27,13 @@ class Enshan:
         try:
             r = session.get(u, headers=headers, timeout=10)
             if '退出' in r.text:
+                name = re.findall(r'访问我的空间">(.*?)</a>', r.text, re.DOTALL)
+                res = f"---- 账号({name[0]}) 恩山论坛 签到结果 ----\n"
                 pattern = r'<em>\s*(恩山币|积分|贡献):\s*</em>(\d+)'
                 matches = re.findall(pattern, r.text)
-                res = ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
+                res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
             else:
-                res = 'cookie失效'
+                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
         except Exception as e:
             res = f"发生异常: {e}"
@@ -43,8 +45,8 @@ class Enshan:
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = str(check_item.get("cookie"))
-            msg = f"---- 账号({i})恩山论坛 签到结果 ----\n{self.sign(cookie)}"
-            msg_all += msg + "\n"
+            msg = self.sign(cookie, i)
+            msg_all += msg + "\n\n"
         return msg_all
 
 if __name__ == "__main__":

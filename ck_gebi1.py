@@ -16,7 +16,8 @@ class gebi1:
         self.check_items = check_items
 
     @staticmethod
-    def sign(cookie):
+    def sign(cookie, i):
+        res = ''
         session = requests.session()
         url = 'https://www.gebi1.com/plugin.php?id=k_misign:sign'
         credit = 'https://www.gebi1.com/home.php?mod=spacecp&ac=credit'
@@ -31,8 +32,11 @@ class gebi1:
             r = session.get(url, headers=headers, timeout=10)
             soup = BeautifulSoup(r.text, "html.parser")
             if not '我的空间' in r.text:
-                return 'cookie失效'
+                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
+            name = soup.find_all('a', class_='author')
+            msg = f"---- 账号({name[0].text}) 隔壁网 签到结果 ----\n"
+            res = f"{msg}<b><span style='color: green'>今日已签到</span></b>\n"
             JD_sign = soup.select_one('#JD_sign')
             if JD_sign:
                 sign_link = 'https://www.gebi1.com/' + JD_sign['href']
@@ -40,11 +44,9 @@ class gebi1:
                 sleep(2)
                 r = session.get(url, headers=headers, timeout=10)
                 soup = BeautifulSoup(r.text, "html.parser")
-                res = "<b><span style='color: green'>签到成功</span></b>\n"
-            else:
-                res = "<b><span style='color: green'>今日已签到</span></b>\n"
+                res = f"{msg}<b><span style='color: green'>签到成功</span></b>\n"
 
-            res = (
+            res += (
                 f'签到排名：{soup.select_one("#qiandaobtnnum")["value"]}\n'
                 f'连续签到：{soup.select_one("#lxdays")["value"]} 天\n'
                 f'签到等级：LV.{soup.select_one("#lxlevel")["value"]}\n'
@@ -58,21 +60,20 @@ class gebi1:
             res += '<b>我的积分:</b>\n' + ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
 
         except requests.Timeout:
-            res += "签到失败: 请求超时"
+            res = "签到失败: 请求超时"
         except requests.RequestException as e:
-            res += f"签到失败: 网络请求异常 - {str(e)}"
+            res = f"签到失败: 网络请求异常 - {str(e)}"
         except AttributeError as e:
-            res += f"签到失败: 属性错误 - {str(e)}"
+            res = f"签到失败: 属性错误 - {str(e)}"
         except Exception as e:
-            res += f"签到失败: {str(e)}"
-
+            res = f"签到失败: {str(e)}"
         return res
 
     def main(self):
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = str(check_item.get("cookie"))
-            msg = f"---- 账号({i})隔壁网签到结果 ----\n{self.sign(cookie)}"
+            msg = self.sign(cookie, i)
             msg_all += msg + "\n\n"
         return msg_all
 

@@ -3,7 +3,7 @@
 cron: 1 0 * * *
 new Env('ypojie');
 """
-
+import re
 from time import sleep
 from utils import get_data
 from notify_mtr import send
@@ -13,7 +13,7 @@ class Get:
         self.check_items = check_items
 
     @staticmethod
-    def sign(username, password):
+    def sign(username, password, i):
         from selenium import webdriver
         from selenium_stealth import stealth
         from selenium.webdriver.common.by import By
@@ -55,23 +55,25 @@ class Get:
             driver.find_element(By.ID, "wp-submit").click()
 
             if '登录 ‹ 易破解' in driver.page_source:
-                return '登录不成功，用户名或密码可能错误。'
+                return f'账号{i}登录不成功，用户名或密码可能错误。'
 
             driver.get(url)
+            name = re.findall(r' Hi, (.*?) ', driver.page_source, re.DOTALL)
+            res = f"---- 账号({name[0]}) 亿破姐 签到结果 ----\n"
             sign_button = WebDriverWait(driver, 5).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, '.usercheck.erphpdown-sc-btn'))
             )
 
             if '已签到' in sign_button.text:
-                res = f"<b><span style='color: green'>今天已经签到</span></b>\n"
+                res += f"<b><span style='color: green'>今天已经签到</span></b>\n"
             else:
                 try:
                     sign_button.click()
                     sleep(2)
                     driver.refresh()
-                    res = f"<b><span style='color: green'>签到成功</span></b>\n"
+                    res += f"<b><span style='color: green'>签到成功</span></b>\n"
                 except Exception as e:
-                    res = f"<b><span style='color: red'>签到失败</span></b>\n{e}"
+                    res += f"<b><span style='color: red'>签到失败</span></b>\n{e}"
 
             assets = driver.find_element(By.CLASS_NAME, 'erphpdown-sc-table').text
             res += assets
@@ -91,10 +93,9 @@ class Get:
         for i, check_item in enumerate(self.check_items, start=1):
             username = check_item.get("username")
             password = check_item.get("password")
-            msg = f"---- 账号({i}) 亿破姐 签到结果 ----\n{self.sign(username, password)}"
+            msg = self.sign(username, password, i)
             msg_all += msg + "\n\n"
         return msg_all
-
 
 if __name__ == "__main__":
     _data = get_data()

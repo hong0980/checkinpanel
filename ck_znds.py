@@ -19,7 +19,7 @@ class znds:
         self.check_items = check_items
 
     @staticmethod
-    def sign(cookie):
+    def sign(cookie, i):
         options = webdriver.ChromeOptions()
         options.add_argument('--headless')  # 无头模式
         options.add_argument('--no-sandbox')
@@ -53,8 +53,10 @@ class znds:
             )
 
             if '立即注册' in driver.page_source:
-                return '<b><span style="color: red">无法登录！可能 Cookie 失效，请重新修改 Cookie</span></b>'
+                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
+            name = re.findall(r'访问我的空间">(.*?)</a>', driver.page_source, re.DOTALL)
+            msg = f"---- 账号({name[0]}) 智能电视网 签到结果 ----\n"
             if '打卡签到' in driver.page_source:
                 sign_button = WebDriverWait(driver, 10).until(
                     EC.element_to_be_clickable((By.XPATH, '//*[@id="toptb"]/div/div[2]/a[2]/font'))
@@ -63,9 +65,9 @@ class znds:
                 alert_info = WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.CLASS_NAME, 'alert_info'))
                 )
-                res = f"<b><span style='color: green'>签到成功</span></b>\n{alert_info.text}\n"
+                res = f"{msg}<b><span style='color: green'>签到成功</span></b>\n{alert_info.text}\n"
             else:
-                res = f"<b><span style='color: green'>今天已经签到过了</span></b>\n"
+                res = f"{msg}<b><span style='color: green'>今天已经签到过了</span></b>\n"
 
             try:
                 driver.get('https://www.znds.com/home.php?mod=spacecp&ac=credit')
@@ -98,7 +100,7 @@ class znds:
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = check_item.get("cookie")
-            msg = f"---- 账号({i}) 智能电视网 签到结果 ----\n{self.sign(cookie)}"
+            msg = self.sign(cookie, i)
             msg_all += msg + "\n\n"
         return msg_all
 
