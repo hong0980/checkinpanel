@@ -54,7 +54,7 @@ class V2ex:
                 return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
             name = driver.find_element(By.XPATH, '//span[@class="bigger"]')
-            msg = f"---- 账号({name.text}) V2EX 签到状态 ----\n"
+            msg = f"---- {name.text} V2EX 签到状态 ----\n"
 
             sign_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, '//input[@type="button"]'))

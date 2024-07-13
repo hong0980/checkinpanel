@@ -56,7 +56,7 @@ class znds:
                 return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
             name = re.findall(r'访问我的空间">(.*?)</a>', driver.page_source, re.DOTALL)
-            msg = f"---- 账号({name[0]}) 智能电视网 签到结果 ----\n"
+            msg = f"---- {name[0]} 智能电视网 签到结果 ----\n"
             if '打卡签到' in driver.page_source:
                 sign_button = WebDriverWait(driver, 10).until(
                     EC.element_to_be_clickable((By.XPATH, '//*[@id="toptb"]/div/div[2]/a[2]/font'))

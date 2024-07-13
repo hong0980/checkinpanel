@@ -28,7 +28,7 @@ class Enshan:
             r = session.get(u, headers=headers, timeout=10)
             if '退出' in r.text:
                 name = re.findall(r'访问我的空间">(.*?)</a>', r.text, re.DOTALL)
-                res = f"---- 账号({name[0]}) 恩山论坛 签到结果 ----\n"
+                res = f"---- {name[0]} 恩山论坛 签到结果 ----\n"
                 pattern = r'<em>\s*(恩山币|积分|贡献):\s*</em>(\d+)'
                 matches = re.findall(pattern, r.text)
                 res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])

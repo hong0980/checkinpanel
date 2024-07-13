@@ -14,7 +14,7 @@ class nicept:
         self.check_items = check_items
 
     @staticmethod
-    def sign(cookie):
+    def sign(cookie, i):
         res = ""
         session = requests.session()
         url = 'https://www.nicept.net/attendance.php'
@@ -27,7 +27,7 @@ class nicept:
         r = session.get(url, headers=headers)
 
         if "登錄" in r.text:
-            return 'cookie 失效'
+            return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
         if "簽到成功" in r.text:
             account_pattern = r'魔力值.*?\]:\s*(.*?)\s*<a.*?分享率：</font>\s*([\d.]+)\s*.*?上傳量：</font>\s*([\d.]+\s*[A-Z]+).*?下載量：</font>\s*([\d.]+\s*[A-Z]+).*?"當前做種".*?>\s*(\d+)\s*<img'
@@ -45,13 +45,15 @@ class nicept:
             else:
                 msg = '<b>账户信息获取失败。</b>\n'
 
+            name = re.findall(r'<b>(.*?)</b>', r.text, re.DOTALL)
+            res = f"---- {name[0]} nicept 签到结果 ----\n"
             details_pattern = r'<p>(這是您的第 <b>\d+</b> 次簽到，已連續簽到 <b>\d+</b> 天，本次簽到獲得 <b>\d+</b> 個魔力值。).*?(今日簽到排名：<b>\d+</b> / <b>\d+</b>)</span>'
             details = re.findall(details_pattern, r.text, re.DOTALL)
             p = f'{details[0][0]}{details[0][1]}' if details else '签到信息获取失败'
 
             res += f"<b><span style='color: green'>签到成功。</span></b>\n{p}\n\n{msg}"
         else:
-            res = "<b><span style='color: red'>签到失败</span></b>"
+            res += "<b><span style='color: red'>签到失败</span></b>"
 
         return res
 
@@ -59,7 +61,7 @@ class nicept:
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = check_item.get("cookie")
-            msg = f"---- 账号({i}) nicept 签到结果 ----\n{self.sign(cookie)}"
+            msg = self.sign(cookie, i)
             msg_all += msg + "\n\n"
         return msg_all
 

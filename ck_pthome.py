@@ -37,7 +37,7 @@ class pthome:
                f'当前做种：{result[5]}\n'
         )
         name = re.findall(r'<b>(.*?)</b>', r.text, re.DOTALL)
-        res = f"---- 账号({name[0]}) pthome 签到结果 ----\n"
+        res = f"---- {name[0]} pthome 签到结果 ----\n"
         if "签到成功" in r.text:
             g = re.findall(r'<p>(这是您.*?魔力值。)</p>', r.text)[0]
             res += f"<b><span style='color: green'>签到成功</span></b>\n{g}\n\n{msg}" 

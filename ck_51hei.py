@@ -27,8 +27,9 @@ class nasyun:
             r = session.get(url, headers=headers, timeout=10)
             if '用户登录' in r.text:
                 return f'账号({i})无法登录！可能Cookie失效，请重新修改'
+
             name = re.findall(r'访问我的空间">(.*?)</a>', r.text, re.DOTALL)
-            res = f"---- 账号({name[0]}) 51黑电子论坛 签到结果 ----\n"
+            res = f"--- {name[0]} 51黑电子论坛 签到结果 ---\n"
             pattern = r'<em>\s*(黑币|威望|积分|贡献):\s*</em>(\d+)'
             matches = re.findall(pattern, r.text)
             res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])

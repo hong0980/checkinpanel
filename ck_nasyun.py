@@ -28,7 +28,7 @@ class nasyun:
                 return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
             name = re.findall(r'<a.*?\.html" target="_blank">(.*?)</a>', r.text, re.DOTALL)
-            res = f"---- 账号({name[0]}) 那是云 签到结果 ----\n"
+            res = f"---- {name[0]} 那是云 签到结果 ----\n"
             pattern = r'<em>\s*(云币|贡献|活跃|积分):\s*</em>(\d+)'
             matches = re.findall(pattern, r.text)
             res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])

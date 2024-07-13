@@ -59,7 +59,7 @@ class Get:
 
             driver.get(url)
             name = re.findall(r' Hi, (.*?) ', driver.page_source, re.DOTALL)
-            res = f"---- 账号({name[0]}) 亿破姐 签到结果 ----\n"
+            res = f"---- {name[0]} 亿破姐 签到结果 ----\n"
             sign_button = WebDriverWait(driver, 5).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, '.usercheck.erphpdown-sc-btn'))
             )

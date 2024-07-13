@@ -35,7 +35,7 @@ class gebi1:
                 return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
             name = soup.find_all('a', class_='author')
-            msg = f"---- 账号({name[0].text}) 隔壁网 签到结果 ----\n"
+            msg = f"---- {name[0].text} 隔壁网 签到结果 ----\n"
             res = f"{msg}<b><span style='color: green'>今日已签到</span></b>\n"
             JD_sign = soup.select_one('#JD_sign')
             if JD_sign:
