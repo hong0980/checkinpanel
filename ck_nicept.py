@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-cron: 0 0 * * *
+cron: 55 59 23 * * *
 new Env('nicept');
 """
 
 import re
 import requests
+from time import sleep
 from notify_mtr import send
 from utils import get_data
+from datetime import datetime, timedelta
 
 class nicept:
     def __init__(self, check_items):
@@ -15,7 +17,6 @@ class nicept:
 
     @staticmethod
     def sign(cookie, i):
-        res = ""
         session = requests.session()
         url = 'https://www.nicept.net/attendance.php'
         headers = {
@@ -24,36 +25,44 @@ class nicept:
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/102.0.0.0 Safari/537.36",
         }
+
+        def countdown():
+            now = datetime.now()
+            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+            sleep_seconds = (midnight - now).total_seconds()
+            print(f'等待{int(sleep_seconds)}秒后执行！')
+            sleep(sleep_seconds)
+
+        countdown()
         r = session.get(url, headers=headers)
+        now_time = datetime.now().time()
 
         if "登錄" in r.text:
             return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
-        if "簽到成功" in r.text:
-            account_pattern = r'魔力值.*?\]:\s*(.*?)\s*<a.*?分享率：</font>\s*([\d.]+)\s*.*?上傳量：</font>\s*([\d.]+\s*[A-Z]+).*?下載量：</font>\s*([\d.]+\s*[A-Z]+).*?"當前做種".*?>\s*(\d+)\s*<img'
-            account_info = re.findall(account_pattern, r.text, re.DOTALL)
-            
-            if account_info:
-                result = account_info[0]
-                msg = (f'<b>账户信息：</b>\n'
-                       f'魔力值：{result[0]}\n'
-                       f'分享率：{result[1]}\n'
-                       f'上传量：{result[2]}\n'
-                       f'下载量：{result[3]}\n'
-                       f'当前做种：{result[4]}\n'
-                      )
-            else:
-                msg = '<b>账户信息获取失败。</b>\n'
+        if "簽到成功" not in r.text:
+            return "<b><span style='color: red'>签到失败</span></b>"
 
-            name = re.findall(r'<b>(.*?)</b>', r.text, re.DOTALL)
-            res = f"---- {name[0]} nicept 签到结果 ----\n"
-            details_pattern = r'<p>(這是您的第 <b>\d+</b> 次簽到，已連續簽到 <b>\d+</b> 天，本次簽到獲得 <b>\d+</b> 個魔力值。).*?(今日簽到排名：<b>\d+</b> / <b>\d+</b>)</span>'
-            details = re.findall(details_pattern, r.text, re.DOTALL)
-            p = f'{details[0][0]}{details[0][1]}' if details else '签到信息获取失败'
+        name = re.findall(r'<b>(.*?)</b>', r.text, re.DOTALL)
+        details_pattern = r'<p>(這是您的第.*?個魔力值。).*?(今日簽到排名：.*?)</span>'
+        details = re.findall(details_pattern, r.text, re.DOTALL)
+        msg = f'{details[0][0]}{details[0][1]}\n'
 
-            res += f"<b><span style='color: green'>签到成功。</span></b>\n{p}\n\n{msg}"
-        else:
-            res += "<b><span style='color: red'>签到失败</span></b>"
+        account_pattern = r'魔力值.*?\]:\s*(.*?)\s*<a.*?分享率：</font>\s*([\d.]+)\s*.*?上傳量：</font>\s*([\d.]+\s*[A-Z]+).*?下載量：</font>\s*([\d.]+\s*[A-Z]+).*?"當前做種".*?>\s*(\d+)\s*<img'
+        account_info = re.findall(account_pattern, r.text, re.DOTALL)
+        
+        if account_info:
+            result = account_info[0]
+            msg += (f'\n<b>账户信息：</b>\n'
+                   f'魔力值：{result[0]}\n'
+                   f'分享率：{result[1]}\n'
+                   f'上传量：{result[2]}\n'
+                   f'下载量：{result[3]}\n'
+                   f'当前做种：{result[4]}\n'
+            )
+
+        res = f"---- {name[0]} nicept 签到结果 ----\n"
+        res += f"<b><span style='color: green'>签到成功。</span></b> {now_time}\n{msg}"
 
         return res
 

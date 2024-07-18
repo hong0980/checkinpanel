@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 cron: 3 0 * * *
-new Env('在线工具');
+new Env('在线工具 签到');
 """
 
 import re
@@ -28,22 +28,26 @@ class ToolLu:
             if '登录' in r.text:
                 return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
-            name = re.findall(r'>(.*?)，你已经连续签到', r.text)
-            if not name:
-                return '在线工具 签到失败'
+            a = re.findall(r'<div class="mb-6">(.*?)，(你已经连续签到 \d+ 天)，再接再厉！</div>', r.text)
 
-            day = re.findall(r'>.*?(你已经连续签到.*?)<', r.text)[0]
+            if not a:
+                return "<b><span style='color: green'>在线工具 签到失败</span></b>"
+
             c = session.get('https://id.tool.lu/credits', headers=headers)
-            credits = re.findall(r'>(.*?)<span class="badge bg-warning">(.*?)</span>', c.text)[0]
+            d = re.findall(r'>(每日签到获得 \d+ 积分)</td>', c.text)
+            t = re.findall(r'<div class="mb-6">(最近签到时间.*?)</div>', r.text)
+            e = re.findall(r'>(.*?)<span class="badge bg-warning">(.*?)</span>', c.text)
 
             return (
-                f"---- {name[0]} 在线工具 签到结果 ----\n"
+                f"---- {a[0][0]} 在线工具 签到结果 ----\n"
                 f"<b><span style='color: green'>签到成功</span></b>\n"
-                f"{day}\n{credits[0]}{credits[1]}"
+                f"{d[0]}\n{a[0][1]}\n{e[0][0]}{e[0][1]}\n{t[0]}"
             )
 
         except requests.RequestException as e:
             return f"请求出错: {e}"
+        except Exception as e:
+            return f"<b><span style='color: red'>未知异常：</span></b>\n{e}"
 
     def main(self):
         msg_all = ""

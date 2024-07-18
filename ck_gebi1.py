@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 0 0 * * *
+cron: 55 59 23 * * *
 new Env('隔壁网 签到');
 """
 
@@ -10,6 +10,7 @@ from time import sleep
 from utils import get_data
 from notify_mtr import send
 from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
 
 class gebi1:
     def __init__(self, check_items):
@@ -28,6 +29,13 @@ class gebi1:
             "Chrome/102.0.0.0 Safari/537.36",
         }
 
+        def countdown():
+            now = datetime.now()
+            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+            sleep_seconds = (midnight - now).total_seconds()
+            print(f'等待{int(sleep_seconds)}秒后执行！')
+            sleep(sleep_seconds)
+
         try:
             r = session.get(url, headers=headers, timeout=10)
             soup = BeautifulSoup(r.text, "html.parser")
@@ -40,11 +48,13 @@ class gebi1:
             JD_sign = soup.select_one('#JD_sign')
             if JD_sign:
                 sign_link = 'https://www.gebi1.com/' + JD_sign['href']
+                countdown()
                 session.get(sign_link, headers=headers, timeout=10)
+                now_time = datetime.now().time()
                 sleep(2)
                 r = session.get(url, headers=headers, timeout=10)
                 soup = BeautifulSoup(r.text, "html.parser")
-                res = f"{msg}<b><span style='color: green'>签到成功</span></b>\n"
+                res = f"{msg}<b><span style='color: green'>签到成功</span></b> {now_time}\n"
 
             res += (
                 f'签到排名：{soup.select_one("#qiandaobtnnum")["value"]}\n'
@@ -60,13 +70,13 @@ class gebi1:
             res += '<b>我的积分:</b>\n' + ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
 
         except requests.Timeout:
-            res = "签到失败: 请求超时"
+            res += "签到失败: 请求超时"
         except requests.RequestException as e:
-            res = f"签到失败: 网络请求异常 - {str(e)}"
+            res += f"签到失败: 网络请求异常 - {str(e)}"
         except AttributeError as e:
-            res = f"签到失败: 属性错误 - {str(e)}"
+            res += f"签到失败: 属性错误 - {str(e)}"
         except Exception as e:
-            res = f"签到失败: {str(e)}"
+            res += f"签到失败: {str(e)}"
         return res
 
     def main(self):

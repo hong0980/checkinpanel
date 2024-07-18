@@ -3,17 +3,15 @@
 # shellcheck disable=SC2005,2188
 <<'COMMENT'
 cron: 1 1 1 1 *
-new Env('安装 selenium-stealth);
+new Env('安装 selenium);
 COMMENT
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-xvfb_pkgs="xvfb"
-chromium_pkgs="chromium libexif eudev"
-chromedriver_pkgs="chromium-chromedriver"
-py_reqs="cryptography selenium-stealth PyVirtualDisplay undetected-chromedriver"
-alpine_pkgs="bash curl gcc git jq libffi-dev make musl-dev openssl-dev py3-pip python3 python3-dev wget"
-alpine_pkgs="$alpine_pkgs $chromium_pkgs $chromedriver_pkgs $xvfb_pkgs"
+chromium_pkgs="chromium chromium-chromedriver libexif eudev xvfb"
+pkgs="bash curl gcc git jq libffi-dev make musl-dev openssl-dev py3-pip python3 python3-dev wget"
+alpine_pkgs="$pkgs $chromium_pkgs"
+py_reqs="selenium-stealth PyVirtualDisplay undetected-chromedriver"
 
 install() {
     count=0

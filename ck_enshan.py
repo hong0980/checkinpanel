@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 cron: 2 0 * * *
-new Env('恩山论坛');
+new Env('恩山论坛 签到');
 """
 
 import re
@@ -27,13 +27,13 @@ class Enshan:
         try:
             r = session.get(u, headers=headers, timeout=10)
             if '退出' in r.text:
-                name = re.findall(r'访问我的空间">(.*?)</a>', r.text, re.DOTALL)
-                res = f"---- {name[0]} 恩山论坛 签到结果 ----\n"
-                pattern = r'<em>\s*(恩山币|积分|贡献):\s*</em>(\d+)'
-                matches = re.findall(pattern, r.text)
-                res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
-            else:
                 return f'账号({i})无法登录！可能Cookie失效，请重新修改'
+
+            name = re.findall(r'访问我的空间">(.*?)</a>', r.text, re.DOTALL)
+            res = f"---- {name[0]} 恩山论坛 签到结果 ----\n"
+            pattern = r'<em>\s*(恩山币|积分|贡献):\s*</em>(\d+)'
+            matches = re.findall(pattern, r.text)
+            res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
 
         except Exception as e:
             res = f"发生异常: {e}"
