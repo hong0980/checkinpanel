@@ -9,14 +9,8 @@ import time
 import answers
 from utils import get_data
 from notify_mtr import send
+from requests_html import HTMLSession
 from datetime import datetime, timedelta
-
-from selenium import webdriver
-# from selenium_stealth import stealth
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException
 
 class Get:
     def __init__(self, check_items):
@@ -24,135 +18,124 @@ class Get:
 
     @staticmethod
     def sign(cookie, i):
-        options = webdriver.ChromeOptions()
-        options.add_argument('--headless')
-        options.add_argument('--no-sandbox')
-        options.add_argument("start-maximized")
-        options.add_argument('--disable-dev-shm-usage')
-
-        service = webdriver.ChromeService(
-            log_output='/tmp/chdbits.log',
-            executable_path='/usr/bin/chromedriver',
-            service_args=['--readable-timestamp']
-        )
-        driver = webdriver.Chrome(service=service, options=options)
-        # stealth(driver,
-        #     platform="Win32",
-        #     fix_hairline=True,
-        #     vendor="Google Inc.",
-        #     languages=["zh-CN", "zh"],
-        #     webgl_vendor="Intel Inc.",
-        #     renderer="Intel Iris OpenGL Engine",
-        # )
+        p, x, msg, res, cg_msg = None, '', '', '', ''
+        session = HTMLSession()
+        url = 'https://ptchdbits.co/bakatest.php'
+        headers = {
+            "Cookie": cookie,
+            'authority': 'ptchdbits.co',
+            'origin': 'https://ptchdbits.co',
+            'referer': 'https://ptchdbits.co/bakatest.php',
+        }
 
         def countdown():
             now = datetime.now()
-            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-            sleep_seconds = (midnight - now).total_seconds()
-            print(f'等待{int(sleep_seconds)}秒后执行！')
-            time.sleep(sleep_seconds)
+            if now.hour == 23 and 57 <= now.minute <= 59:
+                midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+                sleep_seconds = (midnight - now).total_seconds()
+                print(f'等待{int(sleep_seconds)}秒后执行签到！')
+                time.sleep(sleep_seconds)
+
+        def check_answer_values(value):
+            valid_values = {'1', '2', '4', '8'}
+            return not ((isinstance(value, str) and value in valid_values) \
+                   or (isinstance(value, list) and set(value).issubset(valid_values)))
+
+        def generate_answer(r, value):
+            if value:
+                match = re.search(rf"<input[^>]*value='(\d+)'[^>]*>[^<]*{re.escape(value)}", r.text)
+                if match:
+                    return match.group(1)
+
+            from random import choice, sample
+            values = re.findall(r"name='choice.*?value='(\d+)'", r.text)
+            random_value = choice(values)
+            if '多选' in r.text:
+                remaining_values = [v for v in values if v != random_value]
+                return sample(remaining_values, 2) if remaining_values else ['']
+            else:
+                return random_value
 
         try:
-            driver.get('https://ptchdbits.co/torrents.php')
-            for single_cookie in cookie.split('; '):
-                name, value = single_cookie.split('=', 1)
-                driver.add_cookie({'name': name, 'value': value})
-            countdown()
-            driver.get('https://ptchdbits.co/bakatest.php')
-            html = driver.page_source
+            with session as s:
+                countdown()
+                r = s.get(url, headers={"Cookie": cookie}, timeout=10)
+                if '欢迎回来' not in r.text:
+                    return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
-            if '每日签到' not in html:
-                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
-
-            # name_element = WebDriverWait(driver, 5).until(
-            #     EC.presence_of_element_located((By.CSS_SELECTOR, 'a[class="UltimateUser_Name"]'))
-            # )
-            # name = name_element.text
-            name = re.findall(r'class="UltimateUser_Name"><b>(.*?)</b></a>', html, re.DOTALL)[0]
-            res = f"--- {name} CHDBits 签到结果 ---\n"
-            if '今天已经签过到了' not in html:
-                msg = ''
-                # question_id = driver.find_element(By.CSS_SELECTOR, 'input[name="questionid"]').get_attribute('value')
-                question_id = re.findall(r'name="questionid" value="(\d+)">', html)[0]
-                # question_element = driver.find_element(By.CSS_SELECTOR, 'td.text[align="left"]')
-                # choices_element = driver.find_element(By.CSS_SELECTOR, 'td.text[style="white-space: nowrap;"]')
-                # msg = f'<b>{question_id} 答题</b>\n{question_element.text}\n{choices_element.text}\n'
-
-                answer_values = False
-                if question_id:
-                    answer_values = answers.get(question_id)
-
-                if answer_values:
-                    msg += '\n<b>使用答案：</b> \n'
-                    for answer_value in answer_values:
-                        driver.find_element(By.CSS_SELECTOR, f'input[value="{answer_value}"]').click()
-                        question_text = re.findall(f'value="{answer_value}">(.*?)<', html)
-                        question_text[0] = question_text[0].replace("&nbsp;", "")
-                        msg += f'{question_text[0]}\n'
-                    msg += '\n'
-
+                if '今天已经签过到了' in r.text:
+                    qd_msg = re.findall(r'<font color="white">(.*?签到.*?)</font>', r.text)[0]
                 else:
-                    with open('/tmp/chdbits_随机答题.html.txt', 'a', encoding='utf-8') as file:
-                        tbody = driver.find_element(By.XPATH, '//*[@id="outer"]/form/table/tbody')
-                        tr_elements = tbody.find_elements(By.TAG_NAME, 'tr')
-                        for i in range(min(2, len(tr_elements))):
-                            file.write(tr_elements[i].get_attribute('outerHTML') + '\n')
-                        file.write('\n')
+                    question_id = re.findall(r'name="questionid" value="(\d+)"', r.text)[0]
+                    answer = answers.get(question_id)
+                    if not answer or check_answer_values(answer):
+                        x = 1 if answer else 2
+                        answer = generate_answer(r, answer)
 
-                    from random import choice
-                    values = ['1', '2', '4', '8']
-                    random_value = choice(values)
-                    driver.find_element(By.CSS_SELECTOR, f'input[value="{random_value}"]').click()
+                    data = {
+                        'choice[]': answer,
+                        'questionid': question_id,
+                        'usercomment': '此刻心情:无',
+                        'wantskip': '不会',
+                    }
+                    p = s.post(url, headers=headers, data=data)
 
-                    random_value_multi = ''
-                    if '多选' in question_element.text:
-                        remaining_values = [v for v in values if v != random_value]
-                        random_value_multi = choice(remaining_values)
-                        driver.find_element(By.CSS_SELECTOR, f'input[value="{random_value_multi}"]').click()
-                    msg += f'使用随机值：{random_value} {random_value_multi}\n'
+                    now_time = datetime.now().time()
+                    question = re.findall(r'\](\[.*?选\]).*?请问：(.*?)</td></tr>', r.text)[0]
+                    form_tag = r.html.find('form', first=True)
+                    question_text = form_tag.find('td')[1].text.strip()
+                    msg = f'<b>题目 {question_id}</b>\n选择题{question[0]}：{question[1]}\n{question_text}\n\n<b>使用数值答案</b>\n'
+                    if x:
+                        h = '使用题目答案'
+                        if x == 2:
+                            h = '使用随机答案'
+                        msg = f'<b>题目 {question_id}</b>\n选择题{question[0]}：{question[1]}\n{question_text}\n\n<b><span style="color: red">{h}：{answer}</span></b>\n'
+                        tr_tags = form_tag.find('tr')[:2]
+                        with open('/tmp/chdbits_随机答案题目.html.txt', 'a', encoding='utf-8') as file:
+                            for tr in tr_tags:
+                                file.write(tr.html + '\n') 
+                            file.write('\n')
 
-                driver.find_element(By.NAME, 'wantskip').click()
-                now_time = datetime.now().time()
-                res += f"{msg}<b><span style='color: green'>签到成功</span></b> {now_time}\n"
+                    for values in answer:
+                        question_text = re.findall(rf"value='{values}'\s*>(.*?)<", r.text, re.DOTALL)[0]
+                        question_text = re.sub(r"&nbsp;|&quot;", '', question_text)
+                        msg += f'{question_text}\n'
+                    msg += '\n'
+                    qd_msg = re.findall(r'<font color="white">(.*?签到.*?)</font>', p.text)[0]
+                    dt = re.findall(r"title='(.*?)'\s*>(\d+)</td>", p.text)
+                    dt = sorted(set(dt), key=lambda x: int(x[1]))
+                    for match in dt:
+                        if not answers.check_key(match[1]):
+                            print(f"'{match[1]}': '',  # {match[0]}")
 
-            qd_msg = WebDriverWait(driver, 5).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, 'font[color="white"]'))
-            )
-            if answer_values:
-                with open('/tmp/chdbits_答案答题.html.txt', 'w', encoding='utf-8') as f:
-                    f.write(html)
-            res += f"<b><span style='color: {'orange' if '错误' in qd_msg.text else 'purple'}'>{qd_msg.text}</span></b>\n\n"
-            pattern = r'使用</a>]: (.*?)\s*<font.*?分享率：</font>\s*(.*?)\s*<font.*?上传量：</font>\s*(.*?)\s*<font.*?下载量：</font>\s*(.*?)\s*<font.*?当前做种.*?>\s*(\d+)\s*<img.*?做种积分: </font>(.*?)</span>'
-            result = re.findall(pattern, html, re.DOTALL)[0]
-            res += (f'<b>{name} 账户信息：</b>\n'
-                   f'魔力值：{result[0]}\n'
-                   f'分享率：{result[1]}\n'
-                   f'上传量：{result[2]}\n'
-                   f'下载量：{result[3]}\n'
-                   f'当前做种：{result[4]}\n'
-                   f'做种积分：{result[5]}\n'
-            )
-            # import time
-            # for i in range(5):
-            #     screenshot_name = f'/tmp/3图片_chdbits_{i}.png'
-            #     source_code_name = f'/tmp/3chdbits_{i}.html.txt'
-            #     driver.save_screenshot(screenshot_name)
-            #     with open(source_code_name, 'w', encoding='utf-8') as f:
-            #         f.write(html)
-            #     time.sleep(1)
+                    if '获得' in qd_msg:
+                        with open('/tmp/chdbits_成功.html.txt', 'w', encoding='utf-8') as file:
+                            file.write(p.html)
+                        cg_msg = f"<b><span style='color: green'>签到成功</span></b> {now_time}\n"
+                    # else:
+                    #     return "CHDBits 签到失败"
 
-        except TimeoutException as e:
-            res += f"<b><span style='color: red'>超时异常：</span></b>\n{e}"
-        except NoSuchElementException as e:
-            res += f"<b><span style='color: red'>签到失败：</span></b>\n{e}"
-        except WebDriverException as e:
-            res += f"<b><span style='color: red'>WebDriver异常：</span></b>\n{e}"
+                name = re.findall(r"class='UltimateUser_Name'><b>(.*?)</b>", r.text, re.DOTALL)[0]
+                res = f"--- {name} CHDBits 签到结果 ---\n{cg_msg}"
+                res += f"<b><span style='color: {'purple' if '签过到了' in qd_msg else 'orange'}'>{qd_msg}</span></b>\n\n"
+                pattern = r'使用</a>]: (.*?)\s*<font.*?分享率：</font>\s*(.*?)\s*<font.*?上传量：</font>\s*(.*?)\s*<font.*?下载量：</font>\s*(.*?)\s*<font.*?当前做种.*?>\s*(\d+)\s*<img.*?做种积分: </font>(.*?)</span>'
+                text_to_search = p.text if p else r.text if r else ''
+                result = re.findall(pattern, text_to_search, re.DOTALL)[0]
+                res += (f'{msg}<b>账户信息</b>\n'
+                       f'魔力值：{result[0]}\n'
+                       f'分享率：{result[1]}\n'
+                       f'上传量：{result[2]}\n'
+                       f'下载量：{result[3]}\n'
+                       f'当前做种：{result[4]}\n'
+                       f'做种积分：{result[5]}'
+                )
+
         except Exception as e:
-            res += f"<b><span style='color: red'>未知异常：</span></b>\n{e}"
-
+            res = f"发生异常: {e}"
+        except requests.RequestException as e:
+            res = f"请求发生错误: {e}"
         finally:
-            driver.quit()
-
+            session.close()
         return res
 
     def main(self):

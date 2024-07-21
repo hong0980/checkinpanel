@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-cron: 55 59 23 * * *
+cron: 55 59 11,23 * * *
 new Env('隔壁网 签到');
 """
 
 import re
+import time
 import requests
-from time import sleep
 from utils import get_data
 from notify_mtr import send
 from bs4 import BeautifulSoup
@@ -28,15 +28,16 @@ class gebi1:
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/102.0.0.0 Safari/537.36",
         }
-
         def countdown():
             now = datetime.now()
-            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-            sleep_seconds = (midnight - now).total_seconds()
-            print(f'等待{int(sleep_seconds)}秒后执行！')
-            sleep(sleep_seconds)
+            if now.hour == 23 and 57 <= now.minute <= 59:
+                midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+                sleep_seconds = (midnight - now).total_seconds()
+                print(f'等待{int(sleep_seconds)}秒后执行签到！')
+                time.sleep(sleep_seconds)
 
         try:
+            countdown()
             r = session.get(url, headers=headers, timeout=10)
             soup = BeautifulSoup(r.text, "html.parser")
             if not '我的空间' in r.text:
@@ -48,10 +49,9 @@ class gebi1:
             JD_sign = soup.select_one('#JD_sign')
             if JD_sign:
                 sign_link = 'https://www.gebi1.com/' + JD_sign['href']
-                countdown()
                 session.get(sign_link, headers=headers, timeout=10)
                 now_time = datetime.now().time()
-                sleep(2)
+                time.sleep(2)
                 r = session.get(url, headers=headers, timeout=10)
                 soup = BeautifulSoup(r.text, "html.parser")
                 res = f"{msg}<b><span style='color: green'>签到成功</span></b> {now_time}\n"

@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-cron: 55 59 23 * * *
+cron: 55 59 11,23 * * *
 new Env('nicept');
 """
 
 import re
+import time
 import requests
-from time import sleep
 from notify_mtr import send
 from utils import get_data
 from datetime import datetime, timedelta
@@ -17,6 +17,14 @@ class nicept:
 
     @staticmethod
     def sign(cookie, i):
+        def countdown():
+            now = datetime.now()
+            if now.hour == 23 and 57 <= now.minute <= 59:
+                midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+                sleep_seconds = (midnight - now).total_seconds()
+                print(f'等待{int(sleep_seconds)}秒后执行签到！')
+                time.sleep(sleep_seconds)
+
         session = requests.session()
         url = 'https://www.nicept.net/attendance.php'
         headers = {
@@ -25,13 +33,6 @@ class nicept:
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/102.0.0.0 Safari/537.36",
         }
-
-        def countdown():
-            now = datetime.now()
-            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-            sleep_seconds = (midnight - now).total_seconds()
-            print(f'等待{int(sleep_seconds)}秒后执行！')
-            sleep(sleep_seconds)
 
         countdown()
         r = session.get(url, headers=headers)
