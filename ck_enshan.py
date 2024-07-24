@@ -26,7 +26,7 @@ class Enshan:
         }
         try:
             r = session.get(u, headers=headers, timeout=10)
-            if '退出' in r.text:
+            if not '退出' in r.text:
                 return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
             name = re.findall(r'访问我的空间">(.*?)</a>', r.text, re.DOTALL)

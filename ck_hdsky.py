@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 15 0,8,11,20 * * *
+cron: 15 0,11,20 * * *
 new Env('HDSky 签到');
 """
 
@@ -52,7 +52,10 @@ class Get:
                         return s.get('https://hdsky.me/image.php', headers=headers, params=params)
 
                     def binarize_image(img_response, threshold):
-                        img = Image.open(BytesIO(img_response.content)).convert('L')
+                        img = Image.open(BytesIO(img_response.content))
+                        img = img.convert('L')
+                        # 对比度设置
+                        img = ImageEnhance.Contrast(img).enhance(0.9)
                         # 使用LANCZOS插值算法进行放大
                         img = img.resize((img.width * 2, img.height * 2), Image.LANCZOS)
                         # 使用滤波器如中值滤波或高斯滤波来减少图像中的噪声
@@ -67,7 +70,7 @@ class Get:
                         return img
 
                     def recognize_captcha_text(img_response):
-                        img = binarize_image(img_response, 90)
+                        img = binarize_image(img_response, 100)
                         custom_config = r'--oem 3 --psm 6' # oem 0-4 psm 0-13
                         imagestring = pytesseract.image_to_string(img, lang='eng', config=custom_config)
                         imagestring = re.sub(r'[^a-zA-Z0-9]', '', imagestring)
@@ -83,7 +86,7 @@ class Get:
                         imagestring = recognize_captcha_text(img_response)
 
                         if imagestring and len(imagestring) == 6:
-                            print(f"识别到 {imagehash} 验证码是: {imagestring}")
+                            print(f"识别到 {imagehash} 验证码是: {imagestring}，尝试 {attempts + 1} 次执行签到。")
                             data = {
                                 'action': 'showup',
                                 'imagehash': imagehash,
@@ -94,8 +97,8 @@ class Get:
 
                             if p.json()['success'] == True:
                                 days = int((message - 10) / 2 + 1)
-                                cg_msg = (f"签到成功\n已连续签到 {days} 天，魔力值加 {message}，"
-                                       f"明日继续签到可获取 {message + 2} 魔力值"
+                                cg_msg = (f"<b><span style='color: green'>签到成功</span></b>\n已连续签到 {days} 天，"
+                                       f"奖励 {message} 魔力值，明日继续签到可获取 {message + 2} 魔力值"
                                 )
                                 r = s.get('https://hdsky.me/torrents.php', headers=headers)
                                 break
@@ -110,8 +113,8 @@ class Get:
                                 else:
                                     cg_msg = f"尝试次数已达上限 ({max_attempts} 次)，无法完成签到"
                             else:
-                                print("失败，原因未知")
-                                cg_msg = "失败，原因未知"
+                                cg_msg = f"失败，{message if message else ''}原因未知"
+                                print(cg_msg)
                         else:
                             print(f"{imagehash} 识别到的不是6位，尝试重新获取图片...")
                             time.sleep(2)
