@@ -1,118 +1,156 @@
 # -*- coding: utf-8 -*-
 """
-cron: 33 15,19 * * *
-new Env('hdsky 最新电影信息');
+cron: 15 0,8,11,20 * * *
+new Env('HDSky 签到');
 """
 
 import re
+import time
+import requests
+import pytesseract
+from io import BytesIO
 from utils import get_data
 from notify_mtr import send
-from bs4 import BeautifulSoup
-from requests_html import HTMLSession
+from PIL import Image, ImageFilter, ImageEnhance
 
 class Get:
     def __init__(self, check_items):
         self.check_items = check_items
 
-    def sign(self, cookie, Movies_quantity):
-        res = ""
-        session = HTMLSession()
+    @staticmethod
+    def sign(cookie, i):
+        res, cg_msg = '', ''
+        headers = {
+            "Cookie": cookie,
+            'accept': '*/*',
+            'authority': 'hdsky.me',
+            'origin': 'https://hdsky.me',
+            'referer': 'https://hdsky.me/torrents.php',
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/102.0.0.0 Safari/537.36",
+        }
         try:
-            url = 'https://hdsky.me/'
-            r = session.get(url + 'torrents.php', headers={"Cookie": cookie}, timeout=10)
-            if "欢迎回来" in r.text:
-                movie_info = f'<b>（2）当前最新的{Movies_quantity}部信息：</b>\n'
-                soup = BeautifulSoup(r.text, "html.parser")
-                user_name = soup.find('a', class_='InsaneUser_Name').find('b').text
-                Movieslist = soup.find_all('tr', class_='stickbg progresstr')
-                for i, info in enumerate(Movieslist[:int(Movies_quantity)], start=1):
-                    for element in info.find_all('td', class_='embedded'):
-                        spans = element.find_all('span')
-                        if spans:
-                            chinese_name = spans[-1].text
-                            if re.search(r'\d*时\d+分', chinese_name):
-                                chinese_name = spans[-2].text
-                                remaining = ' '.join([span.text for span in spans[1:-2]])
+            with requests.Session() as s:
+                r = s.get('https://hdsky.me/torrents.php', headers=headers, timeout=10)
+                if not "欢迎回来" in r.text:
+                    return f'账号({i})无法登录！可能Cookie失效，请重新修改'
+
+                if '[已签到]' in r.text:
+                    cg_msg = '今天已经签到了'
+                else:
+                    def fetch_image_hash():
+                        f = s.post('https://hdsky.me/image_code_ajax.php', headers=headers, data={'action': 'new'})
+                        return f.json()['code']
+
+                    def fetch_captcha_image(imagehash):
+                        headers['accept'] = 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+                        params = {
+                            'action': 'regimage',
+                            'imagehash': imagehash,
+                        }
+                        return s.get('https://hdsky.me/image.php', headers=headers, params=params)
+
+                    def binarize_image(img_response, threshold):
+                        img = Image.open(BytesIO(img_response.content)).convert('L')
+                        # 使用LANCZOS插值算法进行放大
+                        img = img.resize((img.width * 2, img.height * 2), Image.LANCZOS)
+                        # 使用滤波器如中值滤波或高斯滤波来减少图像中的噪声
+                        img = img.filter(ImageFilter.MedianFilter(size=3))
+                        table = []
+                        for i in range(256):
+                            if i < threshold:
+                                table.append(0)
                             else:
-                                remaining = ' '.join([span.text for span in spans[1:-1]])
+                                table.append(1)
+                        img = img.point(table, '1')
+                        return img
 
-                    imdb_element = info.find('img', src="/pic/icon-imdb.png")
-                    douban_element = info.find('img', src="/pic/icon-douban.png")
-                    imdb_rating = imdb_element.find_next_sibling(string=True).strip() if imdb_element else ''
-                    douban_rating = douban_element.find_next_sibling(string=True).strip() if douban_element else ''
+                    def recognize_captcha_text(img_response):
+                        img = binarize_image(img_response, 90)
+                        custom_config = r'--oem 3 --psm 6' # oem 0-4 psm 0-13
+                        imagestring = pytesseract.image_to_string(img, lang='eng', config=custom_config)
+                        imagestring = re.sub(r'[^a-zA-Z0-9]', '', imagestring)
+                        if imagestring:
+                            img.save(f'/tmp/captcha.jpg')
+                            return imagestring
+                        return None
 
-                    douban_msg = ''
-                    if douban_rating:
-                        movie_link = info.find('a', title=True)['href']
-                        d = session.get(url + movie_link, headers={"Cookie": cookie}, timeout=10)
-                        douban_soup = BeautifulSoup(d.text, 'html.parser')
-                        if '<td class="rowhead">豆瓣' in d.text:
-                            for element in douban_soup.find_all('dl', id='dbdl'):
-                                for dt in element.find_all('dt'):
-                                    key = dt.get_text(strip=True)
-                                    dd = dt.find_next_sibling('dd')
-                                    value = dd.get_text(strip=True) if dd else ''
-                                    douban_msg = ('<b>豆瓣信息：</b>\n'
-                                                 f"【<span style='color: #FE830F'>  {key}  </span>】：{value}\n")
+                    attempts, max_attempts = 0, 5
+                    while attempts < max_attempts:
+                        imagehash = fetch_image_hash()
+                        img_response = fetch_captcha_image(imagehash)
+                        imagestring = recognize_captcha_text(img_response)
 
-                    category = info.img.get('title')
-                    name = info.find('a', title=True)['title']
-                    upload_time = info.find_all('td', class_='rowfollow nowrap')[1].find('span')['title']
+                        if imagestring and len(imagestring) == 6:
+                            print(f"识别到 {imagehash} 验证码是: {imagestring}")
+                            data = {
+                                'action': 'showup',
+                                'imagehash': imagehash,
+                                'imagestring': imagestring,
+                            }
+                            p = s.post('https://hdsky.me/showup.php', headers=headers, data=data)
+                            message = p.json()['message']
 
-                    td_tags = info.find_all('td', class_='rowfollow')
-                    data = [td.get_text(strip=True) for td in td_tags]
-                    if len(data) >= 8:
-                        time, size, seeders, leechers, snatched = data[3:8]
-                        movie_info += (f"<b>{i}):</b>\n"
-                                       f"【<span style='color: magenta'>{category}</span>】："
-                                       f"<b>(<span style='color: green'>{remaining}</span>) "
-                                       f"<span style='color: red'>{chinese_name}</span> "
-                                       f"<span style='color: blue'>{name}</span></b>\n"
-                                       f"【<span style='color: magenta'>文件大小</span>】: {size}\n"
-                                       f"【<span style='color: magenta'>发布时间</span>】: {upload_time}\n"
-                                       f"【<span style='color: magenta'>豆瓣评分</span>】: {douban_rating}\n"
-                                       f"【<span style='color: magenta'>IMDb评分</span>】: {imdb_rating}\n"
-                                       f"【<span style='color: magenta'>存活时间</span>】: {time}\n"
-                                       f"【 <span style='color: magenta'>种子数</span> 】: {seeders}\n"
-                                       f"【 <span style='color: magenta'>下载数</span> 】: {leechers}\n"
-                                       f"【 <span style='color: magenta'>完成数</span> 】: {snatched}\n"
-                                       f"{douban_msg}")
+                            if p.json()['success'] == True:
+                                days = int((message - 10) / 2 + 1)
+                                cg_msg = (f"签到成功\n已连续签到 {days} 天，魔力值加 {message}，"
+                                       f"明日继续签到可获取 {message + 2} 魔力值"
+                                )
+                                r = s.get('https://hdsky.me/torrents.php', headers=headers)
+                                break
+                            elif message == 'date_unmatch':
+                                cg_msg = f"今天已经签到了"
+                                break
+                            elif message == 'invalid_imagehash':
+                                if attempts < max_attempts:
+                                    attempts += 1
+                                    print(f"验证码错误\n第 {attempts} 次，尝试重新识别...")
+                                    time.sleep(2)
+                                else:
+                                    cg_msg = f"尝试次数已达上限 ({max_attempts} 次)，无法完成签到"
+                            else:
+                                print("失败，原因未知")
+                                cg_msg = "失败，原因未知"
+                        else:
+                            print(f"{imagehash} 识别到的不是6位，尝试重新获取图片...")
+                            time.sleep(2)
 
-                bonus = re.findall(r"使用.*?:(.*)\s*<font", r.text)[0].strip()
-                ratio = re.findall(r"分享率.*?> (.*).*?<f", r.text)[0].strip()
-                uploaded = re.findall(r"上传量.*?> (.*).*?<f", r.text)[0].strip()
-                downloaded = re.findall(r"下载量.*?> (.*).*?<f", r.text)[0].strip()
-                active = re.findall(r"trans.gif\"/>(\d+).*?arrowdown", r.text)[0].strip()
-                res += (f"<b>（1）账户信息：</b>\n"
-                        f"用户名：{user_name}\n"
-                        f"魔力值：{bonus}\n"
-                        f"分享率：{ratio}\n"
-                        f"上传量：{uploaded}\n"
-                        f"下载量：{downloaded}\n"
-                        f"当前做种：{active}\n"
-                        f"{movie_info}")
-            else:
-                res = "登录失败，请检查Cookie或网络连接。"
+                name = re.findall(r"class='InsaneUser_Name'><b>(.*?)</b><", r.text, re.DOTALL)[0]
+                res = f"--- {name} HDSky 签到结果 ---\n"
+                res += f"<b><span style='color: {'purple' if '今天已经签到了' in cg_msg else 'orange'}'>{cg_msg}</span></b>\n\n"
+                pattern = r'使用</a>]: (.*?)\s*<font.*?分享率：</font>\s*(.*?)\s*<font.*?上传量：</font>\s*(.*?)\s*<font.*?下载量：</font>\s*(.*?)\s*<font.*?当前做种.*?>\s*(\d+)\s*<img'
+                result = re.findall(pattern, r.text, re.DOTALL)[0]
+                res += (f'<b>账户信息</b>\n'
+                       f'魔力值：{result[0]}\n'
+                       f'分享率：{result[1]}\n'
+                       f'上传量：{result[2]}\n'
+                       f'下载量：{result[3]}\n'
+                       f'当前做种：{result[4]}'
+                )
+
         except requests.RequestException as e:
             res = f"请求异常: {e}"
 
         except Exception as e:
             res = f"出现错误: {e}"
+        finally:
+            s.close()
         return res
 
     def main(self):
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = check_item.get("cookie")
-            quantity = check_item.get("Movies_quantity")
-            sign_msg = self.sign(cookie, quantity)
-            msg = f"{sign_msg}"
-            msg_all += msg + "\n"
+            msg = self.sign(cookie, i)
+            msg_all += msg + "\n\n"
         return msg_all
 
 if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("HDSKY", [])
     result = Get(check_items=_check_items).main()
-    send("hdsky 最新电影信息", result)
-    # print(result)
+    if '今天已经签到了' in result:
+        print(result)
+    else:
+        send("HDSky 签到", result)

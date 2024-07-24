@@ -91,9 +91,9 @@ class Get:
                             h = '使用随机答案'
                         msg = f'<b>题目 {question_id}</b>\n选择题{question[0]}：{question[1]}\n{question_text}\n\n<b><span style="color: red">{h}：{answer}</span></b>\n'
                         tr_tags = form_tag.find('tr')[:2]
-                        with open('/tmp/chdbits_随机答案题目.html.txt', 'a', encoding='utf-8') as file:
+                        with open('/tmp/chdbits_非数值答案题目.html.txt', 'a', encoding='utf-8') as file:
                             for tr in tr_tags:
-                                file.write(tr.html + '\n') 
+                                file.write(tr.html + '\n')
                             file.write('\n')
 
                     for values in answer:
@@ -110,7 +110,7 @@ class Get:
 
                     if '获得' in qd_msg:
                         with open('/tmp/chdbits_成功.html.txt', 'w', encoding='utf-8') as file:
-                            file.write(p.html)
+                            file.write(p.html.html)
                         cg_msg = f"<b><span style='color: green'>签到成功</span></b> {now_time}\n"
                     # else:
                     #     return "CHDBits 签到失败"
