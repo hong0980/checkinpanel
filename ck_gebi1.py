@@ -19,7 +19,6 @@ class gebi1:
     @staticmethod
     def sign(cookie, i):
         res = ''
-        session = requests.session()
         url = 'https://www.gebi1.com/plugin.php?id=k_misign:sign'
         credit = 'https://www.gebi1.com/home.php?mod=spacecp&ac=credit'
         headers = {
@@ -38,36 +37,40 @@ class gebi1:
 
         try:
             countdown()
-            r = session.get(url, headers=headers, timeout=10)
-            soup = BeautifulSoup(r.text, "html.parser")
-            if not '我的空间' in r.text:
-                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
-
-            name = soup.find_all('a', class_='author')
-            msg = f"---- {name[0].text} 隔壁网 签到结果 ----\n"
-            res = f"{msg}<b><span style='color: green'>今日已签到</span></b>\n"
-            JD_sign = soup.select_one('#JD_sign')
-            if JD_sign:
-                sign_link = 'https://www.gebi1.com/' + JD_sign['href']
-                session.get(sign_link, headers=headers, timeout=10)
-                now_time = datetime.now().time()
-                time.sleep(2)
-                r = session.get(url, headers=headers, timeout=10)
+            with requests.Session() as s:
+                r = s.get(url, headers=headers, timeout=10)
                 soup = BeautifulSoup(r.text, "html.parser")
-                res = f"{msg}<b><span style='color: green'>签到成功</span></b> {now_time}\n"
+                if not '我的空间' in r.text:
+                    return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
-            res += (
-                f'签到排名：{soup.select_one("#qiandaobtnnum")["value"]}\n'
-                f'连续签到：{soup.select_one("#lxdays")["value"]} 天\n'
-                f'签到等级：LV.{soup.select_one("#lxlevel")["value"]}\n'
-                f'积分奖励：{soup.select_one("#lxreward")["value"]} 条丝瓜\n'
-                f'累计签到：{soup.select_one("#lxtdays")["value"]} 天\n\n'
-            )
+                name = soup.find_all('a', class_='author')
+                msg = f"---- {name[0].text} 隔壁网 签到结果 ----\n"
+                res = f"{msg}<b><span style='color: green'>今日已签到</span></b>\n"
+                JD_sign = soup.select_one('#JD_sign')
+                if JD_sign:
+                    headers['referer'] = url
+                    # sign_link = 'https://www.gebi1.com/' + JD_sign['href']
+                    sign_link = 'https://www.gebi1.com/plugin.php?id=k_misign:sign&operation=list&inajax=1&ajaxtarget=ranklist'
+                    s.get(sign_link, headers=headers, timeout=10)
+                    now_time = datetime.now().time()
+                    time.sleep(2)
+                    # headers['referer'] = ''
+                    # r = s.get(url, headers=headers, timeout=10)
+                    # soup = BeautifulSoup(r.text, "html.parser")
+                    # res = f"{msg}<b><span style='color: green'>签到成功</span></b> {now_time}\n"
 
-            response = session.get(credit, headers=headers, timeout=10)
-            pattern = r'<em>\s*(丝瓜|经验值|积分|贡献):\s*</em>(\d+)'
-            matches = re.findall(pattern, response.text)
-            res += '<b>我的积分:</b>\n' + ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
+                res += (
+                    f'签到排名：{soup.select_one("#qiandaobtnnum")["value"]}\n'
+                    f'连续签到：{soup.select_one("#lxdays")["value"]} 天\n'
+                    f'签到等级：LV.{soup.select_one("#lxlevel")["value"]}\n'
+                    f'积分奖励：{soup.select_one("#lxreward")["value"]} 条丝瓜\n'
+                    f'累计签到：{soup.select_one("#lxtdays")["value"]} 天\n\n'
+                )
+
+                response = s.get(credit, headers=headers, timeout=10)
+                pattern = r'<em>\s*(丝瓜|经验值|积分|贡献):\s*</em>(\d+)'
+                matches = re.findall(pattern, response.text)
+                res += '<b>我的积分:</b>\n' + ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
 
         except requests.Timeout:
             res += "签到失败: 请求超时"

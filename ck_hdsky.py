@@ -19,7 +19,7 @@ class Get:
 
     @staticmethod
     def sign(cookie, i):
-        res, msg, cg_msg = '', '', ''
+        res, msg, cg_msg, attempts, max_attempts = '', '', '', 0, 5
         headers = {
             "Cookie": cookie,
             'accept': '*/*',
@@ -41,13 +41,12 @@ class Get:
                 else:
                     def fetch_image_hash():
                         return s.post(
-                            'https://hdsky.me/image_code_ajax.php',
-                            headers=headers, data={'action': 'new'}
+                            'https://hdsky.me/image_code_ajax.php', headers=headers, data={'action': 'new'}
                         ).json()['code']
 
                     def fetch_captcha_image(imagehash):
-                        headers['accept'] = 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
                         params = {'action': 'regimage', 'imagehash': imagehash}
+                        headers['accept'] = 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
                         return s.get('https://hdsky.me/image.php', headers=headers, params=params)
 
                     def binarize_image(img_response, threshold):
@@ -65,13 +64,13 @@ class Get:
                         # img = crop_center(img, 210, 30) # 截取图片
                         img = ImageEnhance.Contrast(img).enhance(0.9) # 对比度设置
                         img = img.filter(ImageFilter.MedianFilter(size=3)) # 减少图像中的噪声
-                        table = []
+                        t = []
                         for i in range(256):
                             if i < threshold:
-                                table.append(0)
+                                t.append(0)
                             else:
-                                table.append(1)
-                        img = img.point(table, '1')
+                                t.append(1)
+                        img = img.point(t, '1')
                         return img
 
                     def recognize_captcha_text(img_response):
@@ -80,23 +79,20 @@ class Get:
                         imagestring = pytesseract.image_to_string(img, lang='eng', config=custom_config)
                         imagestring = re.sub(r'[^a-zA-Z0-9]', '', imagestring)
                         if imagestring:
-                            img.save(f'/tmp/captcha.jpg')
+                            img.save(f'/tmp/{imagestring}.jpg')
                             return imagestring
                         return None
 
-                    attempts, max_attempts = 0, 5
                     while attempts < max_attempts:
                         imagehash = fetch_image_hash()
                         img_response = fetch_captcha_image(imagehash)
                         imagestring = recognize_captcha_text(img_response)
-                        short_imagehash = f"{imagehash[:4]}...{imagehash[-4:]}" 
+                        short_imagehash = f"{imagehash[:4]}...{imagehash[-4:]}"
 
                         if imagestring and len(imagestring) == 6:
-                            print(f"识别到 {short_imagehash} 验证码是: {imagestring}，第 {attempts + 1} 次尝试执行签到。")
+                            print(f"识别到 {short_imagehash} 验证码: {imagestring}，执行第 {attempts + 1} 次签到。")
                             data = {
-                                'action': 'showup',
-                                'imagehash': imagehash,
-                                'imagestring': imagestring,
+                                'action': 'showup', 'imagehash': imagehash, 'imagestring': imagestring,
                             }
                             p = s.post('https://hdsky.me/showup.php', headers=headers, data=data)
                             message = p.json()['message']
@@ -115,16 +111,17 @@ class Get:
                             elif message == 'invalid_imagehash':
                                 if attempts < max_attempts:
                                     attempts += 1
-                                    if attempts != 5:
-                                        print(f"验证码识别错误。重新获取验证图片，尝试识别。")
-                                        time.sleep(2)
+                                    print(f"验证码错误。重新获取验证，尝试重新签到。")
+                                    time.sleep(2)
                                 else:
+                                    msg = "<b><span style='color: red'>签到失败/span></b>\n"
                                     cg_msg = f"尝试次数已达上限 ({max_attempts} 次)，无法完成签到"
+                                    print(cg_msg)
                             else:
                                 cg_msg = f"失败，信息：{message if message else ''}"
                                 print(cg_msg)
                         else:
-                            print(f"{short_imagehash} 识别到的 {imagestring} 不是6位。重新获取验证图片，尝试识别。\n")
+                            print(f"识别到 {short_imagehash} 的验证码 {imagestring} 不符合要求。重新获取验证。")
                             time.sleep(2)
 
                 name = re.findall(r"class='InsaneUser_Name'><b>(.*?)</b><", r.text, re.DOTALL)[0]

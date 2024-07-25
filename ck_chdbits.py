@@ -19,7 +19,6 @@ class Get:
     @staticmethod
     def sign(cookie, i):
         p, x, msg, res, cg_msg = None, '', '', '', ''
-        session = HTMLSession()
         url = 'https://ptchdbits.co/bakatest.php'
         headers = {
             "Cookie": cookie,
@@ -57,7 +56,7 @@ class Get:
                 return random_value
 
         try:
-            with session as s:
+            with HTMLSession() as s:
                 countdown()
                 r = s.get(url, headers={"Cookie": cookie}, timeout=10)
                 if '欢迎回来' not in r.text:
@@ -112,8 +111,8 @@ class Get:
                         with open('/tmp/chdbits_成功.html.txt', 'w', encoding='utf-8') as file:
                             file.write(p.html.html)
                         cg_msg = f"<b><span style='color: green'>签到成功</span></b> {now_time}\n"
-                    # else:
-                    #     return "CHDBits 签到失败"
+                    else:
+                        cg_msg = "CHDBits 签到失败"
 
                 name = re.findall(r"class='UltimateUser_Name'><b>(.*?)</b>", r.text, re.DOTALL)[0]
                 res = f"--- {name} CHDBits 签到结果 ---\n{cg_msg}"
