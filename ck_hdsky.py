@@ -19,7 +19,7 @@ class Get:
 
     @staticmethod
     def sign(cookie, i):
-        res, cg_msg = '', ''
+        res, msg, cg_msg = '', '', ''
         headers = {
             "Cookie": cookie,
             'accept': '*/*',
@@ -32,7 +32,7 @@ class Get:
         }
         try:
             with requests.Session() as s:
-                r = s.get('https://hdsky.me/torrents.php', headers=headers, timeout=10)
+                r = s.get('https://hdsky.me/torrents.php', headers=headers, timeout=5)
                 if not "欢迎回来" in r.text:
                     return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
@@ -40,26 +40,31 @@ class Get:
                     cg_msg = '今天已经签到了'
                 else:
                     def fetch_image_hash():
-                        f = s.post('https://hdsky.me/image_code_ajax.php', headers=headers, data={'action': 'new'})
-                        return f.json()['code']
+                        return s.post(
+                            'https://hdsky.me/image_code_ajax.php',
+                            headers=headers, data={'action': 'new'}
+                        ).json()['code']
 
                     def fetch_captcha_image(imagehash):
                         headers['accept'] = 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
-                        params = {
-                            'action': 'regimage',
-                            'imagehash': imagehash,
-                        }
+                        params = {'action': 'regimage', 'imagehash': imagehash}
                         return s.get('https://hdsky.me/image.php', headers=headers, params=params)
 
                     def binarize_image(img_response, threshold):
-                        img = Image.open(BytesIO(img_response.content))
-                        img = img.convert('L')
-                        # 对比度设置
-                        img = ImageEnhance.Contrast(img).enhance(0.9)
-                        # 使用LANCZOS插值算法进行放大
-                        img = img.resize((img.width * 2, img.height * 2), Image.LANCZOS)
-                        # 使用滤波器如中值滤波或高斯滤波来减少图像中的噪声
-                        img = img.filter(ImageFilter.MedianFilter(size=3))
+                        def crop_center(img, width, height):
+                            img_width, img_height = img.size
+                            left = (img_width - width) // 2
+                            top = (img_height - height) // 2
+                            right = left + width
+                            bottom = top + height
+                            return img.crop((left, top, right, bottom))
+
+                        img = Image.open(BytesIO(img_response.content)).convert('L')
+                        img = img.resize((img.width * 2, img.height * 2), Image.LANCZOS) # 使用LANCZOS插值算法进行放大
+                        img = img.crop((45, 25, 252, 55)) # 截取图片
+                        # img = crop_center(img, 210, 30) # 截取图片
+                        img = ImageEnhance.Contrast(img).enhance(0.9) # 对比度设置
+                        img = img.filter(ImageFilter.MedianFilter(size=3)) # 减少图像中的噪声
                         table = []
                         for i in range(256):
                             if i < threshold:
@@ -84,9 +89,10 @@ class Get:
                         imagehash = fetch_image_hash()
                         img_response = fetch_captcha_image(imagehash)
                         imagestring = recognize_captcha_text(img_response)
+                        short_imagehash = f"{imagehash[:4]}...{imagehash[-4:]}" 
 
                         if imagestring and len(imagestring) == 6:
-                            print(f"识别到 {imagehash} 验证码是: {imagestring}，尝试 {attempts + 1} 次执行签到。")
+                            print(f"识别到 {short_imagehash} 验证码是: {imagestring}，第 {attempts + 1} 次尝试执行签到。")
                             data = {
                                 'action': 'showup',
                                 'imagehash': imagehash,
@@ -97,30 +103,32 @@ class Get:
 
                             if p.json()['success'] == True:
                                 days = int((message - 10) / 2 + 1)
-                                cg_msg = (f"<b><span style='color: green'>签到成功</span></b>\n已连续签到 {days} 天，"
+                                msg = "<b><span style='color: green'>签到成功</span></b>\n"
+                                cg_msg = (f"已连续签到 {days} 天，"
                                        f"奖励 {message} 魔力值，明日继续签到可获取 {message + 2} 魔力值"
                                 )
                                 r = s.get('https://hdsky.me/torrents.php', headers=headers)
                                 break
                             elif message == 'date_unmatch':
-                                cg_msg = f"今天已经签到了"
+                                cg_msg = f"你今天已经签到了，请勿重复签到"
                                 break
                             elif message == 'invalid_imagehash':
                                 if attempts < max_attempts:
                                     attempts += 1
-                                    print(f"验证码错误\n第 {attempts} 次，尝试重新识别...")
-                                    time.sleep(2)
+                                    if attempts != 5:
+                                        print(f"验证码识别错误。重新获取验证图片，尝试识别。")
+                                        time.sleep(2)
                                 else:
                                     cg_msg = f"尝试次数已达上限 ({max_attempts} 次)，无法完成签到"
                             else:
-                                cg_msg = f"失败，{message if message else ''}原因未知"
+                                cg_msg = f"失败，信息：{message if message else ''}"
                                 print(cg_msg)
                         else:
-                            print(f"{imagehash} 识别到的不是6位，尝试重新获取图片...")
+                            print(f"{short_imagehash} 识别到的 {imagestring} 不是6位。重新获取验证图片，尝试识别。\n")
                             time.sleep(2)
 
                 name = re.findall(r"class='InsaneUser_Name'><b>(.*?)</b><", r.text, re.DOTALL)[0]
-                res = f"--- {name} HDSky 签到结果 ---\n"
+                res = f"\n--- {name} HDSky 签到结果 ---\n{msg}"
                 res += f"<b><span style='color: {'purple' if '今天已经签到了' in cg_msg else 'orange'}'>{cg_msg}</span></b>\n\n"
                 pattern = r'使用</a>]: (.*?)\s*<font.*?分享率：</font>\s*(.*?)\s*<font.*?上传量：</font>\s*(.*?)\s*<font.*?下载量：</font>\s*(.*?)\s*<font.*?当前做种.*?>\s*(\d+)\s*<img'
                 result = re.findall(pattern, r.text, re.DOTALL)[0]
