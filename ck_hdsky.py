@@ -11,6 +11,7 @@ import pytesseract
 from io import BytesIO
 from utils import get_data
 from notify_mtr import send
+from requests_html import HTMLSession
 from PIL import Image, ImageFilter, ImageEnhance
 
 class Get:
@@ -31,7 +32,7 @@ class Get:
             "Chrome/102.0.0.0 Safari/537.36",
         }
         try:
-            with requests.Session() as s:
+            with HTMLSession() as s:
                 r = s.get('https://hdsky.me/torrents.php', headers=headers, timeout=5)
                 if not "欢迎回来" in r.text:
                     return f'账号({i})无法登录！可能Cookie失效，请重新修改'
@@ -79,7 +80,7 @@ class Get:
                         imagestring = pytesseract.image_to_string(img, lang='eng', config=custom_config)
                         imagestring = re.sub(r'[^a-zA-Z0-9]', '', imagestring)
                         if imagestring:
-                            img.save(f'/tmp/{imagestring}.jpg')
+                            img.save(f'/tmp/captcha.jpg')
                             return imagestring
                         return None
 
@@ -139,11 +140,8 @@ class Get:
 
         except requests.RequestException as e:
             res = f"请求异常: {e}"
-
         except Exception as e:
             res = f"出现错误: {e}"
-        finally:
-            s.close()
         return res
 
     def main(self):

@@ -8,8 +8,8 @@ COMMENT
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-alpine_pkgs="python3-dev py3-pip build-base jpeg-dev zlib-dev tesseract-ocr-data-eng"
-py_reqs="pytesseract opencv-python"
+py_reqs="pytesseract"
+alpine_pkgs="build-base jpeg-dev zlib-dev tesseract-ocr-data-eng"
 
 install() {
     count=0
@@ -45,12 +45,12 @@ install_alpine_pkgs() {
 }
 
 install_py_reqs() {
-    pip3 install --upgrade pip
+    pip3 install --root-user-action=ignore --upgrade pip
     for req in $py_reqs; do
         if pip show "$req" >/dev/null 2>&1; then
             echo "$req 已安装"
         else
-            install 0 "pip3 install $req" "$(pip3 install "$req" | grep -c 'Successfully')"
+            install 0 "pip3 install $req" "$(pip3 install --disable-pip-version-check --root-user-action=ignore "$req" | grep -c 'Successfully')"
         fi
     done
 }

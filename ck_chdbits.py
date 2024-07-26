@@ -133,8 +133,6 @@ class Get:
             res = f"发生异常: {e}"
         except requests.RequestException as e:
             res = f"请求发生错误: {e}"
-        finally:
-            session.close()
         return res
 
     def main(self):

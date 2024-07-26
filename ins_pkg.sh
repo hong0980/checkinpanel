@@ -12,8 +12,9 @@ checkinpanel_master=$(find "${SCR_PATH}" -type d -name "*checkinpanel_master" -p
 checkinpanel_master=${checkinpanel_master##*/}
 checkinpanel_master=${checkinpanel_master:-"OreosLab_checkinpanel_master"}
 
-alpine_pkgs="bash curl gcc git jq libffi-dev make musl-dev openssl-dev perl perl-app-cpanminus perl-dev py3-pip python3 python3-dev wget"
-py_reqs="cryptography dateparser feedparser peewee requests_html rsa schedule tomli lxml_html_clean"
+alpine_pkgs="bash curl gcc git jq libffi-dev make musl-dev openssl-dev \
+            perl perl-app-cpanminus perl-dev py3-pip python3 python3-dev wget"
+py_reqs="cryptography dateparser feedparser peewee pytest requests_html rsa schedule tomli lxml_html_clean"
 js_pkgs="@iarna/toml axios cron-parser crypto-js got"
 pl_mods="File::Slurp JSON5 TOML::Dumper"
 
@@ -61,14 +62,25 @@ install_alpine_pkgs() {
 }
 
 install_py_reqs() {
-    pip3 install --upgrade pip
+    pip3 install --root-user-action=ignore --upgrade pip
     for req in $py_reqs; do
         if check_python_pkg_installed "$req"; then
             echo "$req 已安装"
         else
-            install 0 "pip3 install $req" "$(pip3 install "$req" | grep -c 'Successfully')"
+            install 0 "pip3 install $req" \
+            "$(pip3 install --disable-pip-version-check --root-user-action=ignore "$req" | grep -c 'Successfully')"
         fi
     done
+
+    requests_html_info=$(pip show 'requests_html') || return
+    requests_html_path=$(echo "$requests_html_info" | awk '/Location: / {print $2}')"/requests_html.py"
+    if [ -f "$requests_html_path" ] && ! grep -q 'executablePath' "$requests_html_path"; then
+        sed -i \
+            -e "s|self, mock_browser|self, executablePath : str = None, mock_browser|" \
+            -e "s|args=self.__browser_args)|args=self.__browser_args, executablePath=self.executablePath)|" \
+            -e "/browser_args = browser_args/a\        self.executablePath = executablePath" \
+            "$requests_html_path"
+    fi
 }
 
 install_js_pkgs_initial() {
@@ -82,7 +94,8 @@ install_js_pkgs_initial() {
         mv package.json package.bak.json
         mv pnpm-lock.yaml pnpm-lock.bak.yaml
 
-        install 1 "npm install -g package-merge" "$(npm install -g package-merge && npm ls -g package-merge | grep -cE '(empty)|ERR')" &&
+        install 1 "npm install -g package-merge" "$(npm install -g package-merge && \
+            npm ls -g package-merge | grep -cE '(empty)|ERR')" &&
             export NODE_PATH="/usr/local/lib/node_modules" &&
             node -e "
                 const merge = require('package-merge');

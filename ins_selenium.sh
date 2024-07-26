@@ -8,10 +8,9 @@ COMMENT
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-chromium_pkgs="chromium chromium-chromedriver libexif eudev xvfb"
-pkgs="bash curl gcc git jq libffi-dev make musl-dev openssl-dev py3-pip python3 python3-dev wget"
-alpine_pkgs="$pkgs $chromium_pkgs"
 py_reqs="selenium-stealth PyVirtualDisplay undetected-chromedriver"
+alpine_pkgs="bash curl gcc git jq libffi-dev make musl-dev openssl-dev wget \
+            chromium chromium-chromedriver libexif eudev xvfb"
 
 install() {
     count=0
@@ -47,12 +46,12 @@ install_alpine_pkgs() {
 }
 
 install_py_reqs() {
-    pip3 install --upgrade pip
+    pip3 install --root-user-action=ignore --upgrade pip
     for req in $py_reqs; do
         if pip show "$req" >/dev/null 2>&1; then
             echo "$req 已安装"
         else
-            install 0 "pip3 install $req" "$(pip3 install "$req" | grep -c 'Successfully')"
+            install 0 "pip3 install $req" "$(pip3 install --disable-pip-version-check --root-user-action=ignore "$req" | grep -c 'Successfully')"
         fi
     done
 }
