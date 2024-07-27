@@ -112,7 +112,7 @@ class Get:
                             file.write(p.html.html)
                         cg_msg = f"<b><span style='color: green'>签到成功</span></b> {now_time}\n"
                     else:
-                        cg_msg = "CHDBits 签到失败"
+                        cg_msg = "<b><span style='color: red'>签到失败</span></b>"
 
                 name = re.findall(r"class='UltimateUser_Name'><b>(.*?)</b>", r.text, re.DOTALL)[0]
                 res = f"--- {name} CHDBits 签到结果 ---\n{cg_msg}"
