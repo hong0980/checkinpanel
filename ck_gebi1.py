@@ -23,7 +23,7 @@ class gebi1:
         def countdown():
             now = datetime.now()
             if now.hour == 23 and 57 <= now.minute <= 59:
-                midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1, seconds=1)
+                midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1, seconds=2)
                 sleep_seconds = (midnight - now).total_seconds()
                 print(f'等待{int(sleep_seconds)}秒后执行签到！')
                 time.sleep(sleep_seconds)
@@ -44,8 +44,8 @@ class gebi1:
                     s.get(sign_link, headers={"Cookie": cookie})
                     now_time = datetime.now().time()
                     time.sleep(2)
-                    if not JD_sign:
-                        r = s.get(url, headers={"Cookie": cookie})
+                    r = s.get(url, headers={"Cookie": cookie})
+                    if not r.html.find('a#JD_sign', first=True):
                         res = f"{msg}<b><span style='color: green'>签到成功</span></b> {now_time}\n"
 
                 res += (
@@ -61,10 +61,6 @@ class gebi1:
                 matches = re.findall(pattern, response.text)
                 res += '<b>我的积分:</b>\n' + ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
 
-        except requests.Timeout:
-            res += "签到失败: 请求超时"
-        except requests.RequestException as e:
-            res += f"签到失败: 网络请求异常 - {str(e)}"
         except AttributeError as e:
             res += f"签到失败: 属性错误 - {str(e)}"
         except Exception as e:

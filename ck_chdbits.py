@@ -107,12 +107,11 @@ class Get:
                         if not answers.check_key(match[1]):
                             print(f"'{match[1]}': '',  # {match[0]}")
 
+                    cg_msg = "<b><span style='color: red'>签到失败</span></b>\n"
                     if '获得' in qd_msg:
+                        cg_msg = f"<b><span style='color: green'>签到成功</span></b> {now_time}\n"
                         with open('/tmp/chdbits_成功.html.txt', 'w', encoding='utf-8') as file:
                             file.write(p.html.html)
-                        cg_msg = f"<b><span style='color: green'>签到成功</span></b> {now_time}\n"
-                    else:
-                        cg_msg = "<b><span style='color: red'>签到失败</span></b>"
 
                 name = re.findall(r"class='UltimateUser_Name'><b>(.*?)</b>", r.text, re.DOTALL)[0]
                 res = f"--- {name} CHDBits 签到结果 ---\n{cg_msg}"

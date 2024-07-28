@@ -20,10 +20,9 @@ class Get:
 
     @staticmethod
     def sign(cookie, i):
-        res, msg, cg_msg, attempts, max_attempts = '', '', '', 0, 5
+        res, msg, cg_msg, count, max_count = '', '', '', 0, 5
         headers = {
             "Cookie": cookie,
-            'accept': '*/*',
             'authority': 'hdsky.me',
             'origin': 'https://hdsky.me',
             'referer': 'https://hdsky.me/torrents.php',
@@ -70,19 +69,19 @@ class Get:
                         custom_config = r'--oem 3 --psm 6' # oem 0-4 psm 0-13
                         imagestring = pytesseract.image_to_string(img, lang='eng', config=custom_config)
                         imagestring = re.sub(r'\W+', '', imagestring)
-                        if imagestring:
+                        if imagestring and len(imagestring) == 6:
                             img.save(f'/tmp/captcha.jpg')
                             return imagestring
                         return None
 
-                    while attempts < max_attempts:
+                    while count < max_count:
                         imagehash = fetch_image_hash()
                         img_response = fetch_captcha_image(imagehash)
                         imagestring = recognize_captcha_text(img_response)
-                        short_imagehash = f"{imagehash[:4]}...{imagehash[-4:]}"
+                        short_imagehash = f"{imagehash[:3]}...{imagehash[-3:]}"
 
-                        if imagestring and len(imagestring) == 6:
-                            print(f"识别到 {short_imagehash} 验证码: {imagestring}，执行第 {attempts + 1} 次签到。")
+                        if imagestring:
+                            print(f"识别到 {short_imagehash} 验证码: {imagestring}，执行第 {count + 1} 次签到。")
                             data = {
                                 'action': 'showup', 'imagehash': imagehash, 'imagestring': imagestring,
                             }
@@ -101,19 +100,19 @@ class Get:
                                 cg_msg = f"你今天已经签到了，请勿重复签到"
                                 break
                             elif message == 'invalid_imagehash':
-                                if attempts < max_attempts:
-                                    attempts += 1
-                                    print(f"验证码错误。5 秒重新获取验证，尝试重新签到。")
+                                count += 1
+                                if count != max_count:
+                                    print(f"验证码错误。5 秒后重新获取验证，尝试重新签到。")
                                     time.sleep(5)
                                 else:
                                     msg = "<b><span style='color: red'>签到失败/span></b>\n"
-                                    cg_msg = f"尝试次数已达上限 ({max_attempts} 次)，无法完成签到"
+                                    cg_msg = f"验证码错误。已经尝试 {max_count} 次签到，稍后再试。"
                                     print(cg_msg)
                             else:
                                 cg_msg = f"失败，信息：{message if message else '未知'}"
                                 print(cg_msg)
                         else:
-                            print(f"识别到 {short_imagehash} 的验证码 {imagestring} 不符合要求。5 秒重新获取验证。")
+                            print(f"识别到 {short_imagehash} 的验证码不符合要求。5 秒后重新获取验证。")
                             time.sleep(5)
 
                 name = re.findall(r"class='InsaneUser_Name'><b>(.*?)</b><", r.text, re.DOTALL)[0]
