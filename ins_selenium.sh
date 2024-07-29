@@ -3,14 +3,13 @@
 # shellcheck disable=SC2005,2188
 <<'COMMENT'
 cron: 1 1 1 1 *
-new Env('安装 selenium);
+new Env('安装 selenium-tesseract);
 COMMENT
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-py_reqs="selenium-stealth PyVirtualDisplay undetected-chromedriver"
-alpine_pkgs="bash curl gcc git jq libffi-dev make musl-dev openssl-dev wget \
-            chromium chromium-chromedriver libexif eudev xvfb"
+py_reqs="pytesseract selenium-stealth PyVirtualDisplay undetected-chromedriver"
+alpine_pkgs="build-base tesseract-ocr-data-eng chromium chromium-chromedriver libexif eudev xvfb"
 
 install() {
     count=0
@@ -51,7 +50,8 @@ install_py_reqs() {
         if pip show "$req" >/dev/null 2>&1; then
             echo "$req 已安装"
         else
-            install 0 "pip3 install $req" "$(pip3 install --disable-pip-version-check --root-user-action=ignore "$req" | grep -c 'Successfully')"
+            install 0 "pip3 install $req" \
+            "$(pip3 install --disable-pip-version-check --root-user-action=ignore "$req" | grep -c 'Successfully')"
         fi
     done
 }

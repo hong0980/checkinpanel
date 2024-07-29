@@ -12,11 +12,10 @@ checkinpanel_master=$(find "${SCR_PATH}" -type d -name "*checkinpanel_master" -p
 checkinpanel_master=${checkinpanel_master##*/}
 checkinpanel_master=${checkinpanel_master:-"OreosLab_checkinpanel_master"}
 
-alpine_pkgs="bash curl gcc git jq libffi-dev make musl-dev openssl-dev \
-            perl perl-app-cpanminus perl-dev py3-pip python3 python3-dev wget"
-py_reqs="cryptography dateparser feedparser peewee pytest requests_html rsa schedule tomli lxml_html_clean"
-js_pkgs="@iarna/toml axios cron-parser crypto-js got"
 pl_mods="File::Slurp JSON5 TOML::Dumper"
+js_pkgs="@iarna/toml axios cron-parser crypto-js got"
+alpine_pkgs="libffi-dev make openssl-dev perl-app-cpanminus perl-dev py3-pip"
+py_reqs="cryptography dateparser feedparser peewee pytest requests_html schedule tomli lxml_html_clean"
 
 install() {
     count=0
@@ -40,20 +39,10 @@ install() {
     done
 }
 
-check_alpine_pkg_installed() {
-    apk info -e "$1" >/dev/null 2>&1
-    return $?
-}
-
-check_python_pkg_installed() {
-    pip show "$1" >/dev/null 2>&1
-    return $?
-}
-
 install_alpine_pkgs() {
     apk update
     for pkg in $alpine_pkgs; do
-        if check_alpine_pkg_installed "$pkg"; then
+        if apk info -e "$pkg" >/dev/null 2>&1; then
             echo "$pkg 已安装"
         else
             install 0 "apk add $pkg" "$(apk add --no-cache "$pkg" | grep -c 'OK')"
@@ -64,7 +53,7 @@ install_alpine_pkgs() {
 install_py_reqs() {
     pip3 install --root-user-action=ignore --upgrade pip
     for req in $py_reqs; do
-        if check_python_pkg_installed "$req"; then
+        if pip show "$req" >/dev/null 2>&1; then
             echo "$req 已安装"
         else
             install 0 "pip3 install $req" \
@@ -122,17 +111,13 @@ install_js_pkgs_each() {
         echo "$1 已正确安装"
     else
         if [ -n "$has_err" ]; then
-            uninstall_js_pkgs "$1"
+            npm uninstall "$1"
+            rm -rf "$(pwd)/node_modules/$1"
+            rm -rf /usr/local/lib/node_modules/lodash/*
+            npm cache clear --force
         fi
         install 1 "npm install $1" "$(npm install --force "$1" && npm ls --force "$1" | grep -cE '(empty)|ERR')"
     fi
-}
-
-uninstall_js_pkgs() {
-    npm uninstall "$1"
-    rm -rf "$(pwd)/node_modules/$1"
-    rm -rf /usr/local/lib/node_modules/lodash/*
-    npm cache clear --force
 }
 
 install_js_pkgs_all() {
