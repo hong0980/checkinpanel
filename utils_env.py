@@ -18,7 +18,7 @@ def get_env_str() -> str:
         return ENV
 
     v2p_file = "/usr/local/app/script/Lists/task.list"
-    ql_new_file = "/ql/data/config/env.sh"
+    ql_new_file = "/ql/data/config/token.json"
     ql_file = "/ql/config/env.sh"
 
    # print("尝试检查运行环境...")

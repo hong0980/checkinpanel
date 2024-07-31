@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-cron: 15 0,11,20 * * *
+cron: 6 0,20 * * *
 new Env('HDSky 签到');
 """
 
 import re
 import time
-import requests
 import pytesseract
 from io import BytesIO
 from utils import get_data
@@ -128,8 +127,6 @@ class Get:
                        f'当前做种：{result[4]}'
                 )
 
-        except requests.RequestException as e:
-            res = f"请求异常: {e}"
         except Exception as e:
             res = f"出现错误: {e}"
         return res
@@ -138,8 +135,7 @@ class Get:
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = check_item.get("cookie")
-            msg = self.sign(cookie, i)
-            msg_all += msg + "\n\n"
+            msg_all += f'{self.sign(cookie, i)}\n\n'
         return msg_all
 
 if __name__ == "__main__":
