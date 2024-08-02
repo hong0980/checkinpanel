@@ -7,12 +7,7 @@ import re
 from time import sleep
 from utils import get_data
 from notify_mtr import send
-from selenium import webdriver
-from selenium_stealth import stealth
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException
+from requests_html import HTML, HTMLSession
 
 class znds:
     def __init__(self, check_items):
@@ -20,88 +15,48 @@ class znds:
 
     @staticmethod
     def sign(cookie, i):
-        options = webdriver.ChromeOptions()
-        options.add_argument('--headless')  # 无头模式
-        options.add_argument('--no-sandbox')
-        options.add_argument("start-maximized")
-        options.add_argument('--disable-dev-shm-usage')
-
-        service = webdriver.ChromeService(
-            log_output='/tmp/znds.log',
-            executable_path='/usr/bin/chromedriver',
-            service_args=['--readable-timestamp']
-        )
-
-        driver = webdriver.Chrome(service=service, options=options)
-        stealth(driver,
-            platform="Win32",
-            fix_hairline=True,
-            vendor="Google Inc.",
-            languages=["zh-CN", "zh"],
-            webgl_vendor="Intel Inc.",
-            renderer="Intel Iris OpenGL Engine",
-        )
-
         try:
-            driver.get('https://www.znds.com')
-            for single_cookie in cookie.split('; '):
-                name, value = single_cookie.split('=', 1)
-                driver.add_cookie({'name': name, 'value': value})
-            driver.refresh()
-            WebDriverWait(driver, 10).until(
-                EC.visibility_of_element_located((By.ID, 'commonNav_btn'))
-            )
-
-            if '立即注册' in driver.page_source:
+            s = HTMLSession()
+            url = 'https://www.znds.com/'
+            s.headers.update({'referer': url, 'authority': 'www.znds.com'})
+            s.cookies.set('Cookie', cookie)
+            r = s.get(url)
+            name = r.html.search('title="访问我的空间">{}</a>')
+            name = name[0] if name else None
+            if name is None:
                 return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
-            name = re.findall(r'访问我的空间">(.*?)</a>', driver.page_source, re.DOTALL)
-            msg = f"---- {name[0]} 智能电视网 签到结果 ----\n"
-            if '打卡签到' in driver.page_source:
-                sign_button = WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.XPATH, '//*[@id="toptb"]/div/div[2]/a[2]/font'))
-                )
-                sign_button.click()
-                alert_info = WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, 'alert_info'))
-                )
-                res = f"{msg}<b><span style='color: green'>签到成功</span></b>\n{alert_info.text}\n"
-            else:
-                res = f"{msg}<b><span style='color: green'>今天已经签到过了</span></b>\n"
+            formhash = re.findall(r'action=logout&amp;formhash=(\w+)">退出', r.text)
+            sign_url = f'{url}plugin.php?id=ljdaka:daka&action=msg&formhash={formhash[0]}&infloat=yes&handlekey=ljdaka&inajax=1&ajaxtarget=fwin_content_ljdaka'
 
-            try:
-                driver.get('https://www.znds.com/home.php?mod=spacecp&ac=credit')
-                pattern = r'<em>\s*(金币|积分|威望|Z币):\s*</em>(\d+)'
-                matches = re.findall(pattern, driver.page_source)
-                res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
-            except NoSuchElementException as e:
-                res += f"<b><span style='color: red'>获取积分信息失败：</span></b>\n{e}"
-            except Exception as e:
-                res += f"<b><span style='color: red'>获取积分信息未知异常：</span></b>\n{e}"
+            r = s.get(sign_url)
+            msg = r.html.search('class="alert_info"><p>{}</p></div>')
+            sign_msg = "<b><span style='color: red'>签到失败</span></b>"
+            if '获得' in msg[0]:
+                sign_msg = (f"<b><span style='color: green'>签到成功</span>\n"
+                            f"<span style='color: orange'>{msg[0]}</span></b>")
+            elif '明日再来' in msg[0]:
+                sign_msg = f"<b><span style='color: orange'>{msg[0]}</span></b>"
 
-        except TimeoutException as e:
-            res = f"<b><span style='color: red'>超时异常：</span></b>\n{e}"
-        except NoSuchElementException as e:
-            res = f"<b><span style='color: red'>签到失败：</span></b>\n{e}"
-        except WebDriverException as e:
-            res = f"<b><span style='color: red'>WebDriver异常：</span></b>\n{e}"
+            f = s.get(f'{url}home.php?mod=spacecp&ac=credit')
+            pattern = r'<em>\s*(金币|积分|威望|Z币):\s*</em>(\d+)'
+            matches = re.findall(pattern, f.text)
+            credit_info = ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
+
+            result = (f"-- {name} 智能电视网 签到结果 --"
+                      f'\n{sign_msg}\n\n<b>账户信息</b>\n{credit_info}')
+
         except Exception as e:
-            res = f"<b><span style='color: red'>未知异常：</span></b>\n{e}"
-
+            result = f"发生异常: {e}"
         finally:
-            # driver.get('https://bot.sannysoft.com/')
-            # total_height = driver.execute_script("return document.body.scrollHeight")
-            # driver.set_window_size(1920, total_height)
-            # driver.save_screenshot('/tmp/screenshot.png')
-            driver.quit()
-        return res
+            pass
+        return result
 
     def main(self):
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = check_item.get("cookie")
-            msg = self.sign(cookie, i)
-            msg_all += msg + "\n\n"
+            msg_all += f'{self.sign(cookie, i)}\n\n'
         return msg_all
 
 if __name__ == "__main__":

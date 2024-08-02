@@ -51,14 +51,16 @@ class Get:
 
                 if '已签到' in sign_button.text:
                     res += f"<b><span style='color: green'>今天已经签到</span></b>\n{assets[0]}： {assets[1]}"
-                    return res
+                else:
+                    headers['referer'] = 'https://www.ypojie.com/vip'
+                    headers['accept'] = 'application/json, text/javascript, */*; q=0.01'
+                    r = s.post('https://www.ypojie.com/wp-admin/admin-ajax.php', headers=headers, data={'action': 'epd_checkin'})
+                    sleep(5)
+                    print(r.html.html)
+                    # sign_button = r.html.find('a.usercheck.erphpdown-sc-btn', first=True)
 
-                headers['referer'] = 'https://www.ypojie.com/vip'
-                headers['accept'] = 'application/json, text/javascript, */*; q=0.01'
-                r = s.post('https://www.ypojie.com/wp-admin/admin-ajax.php', headers=headers, data={'action': 'epd_checkin'})
-                sign_button = r.html.find('a.usercheck.erphpdown-sc-btn', first=True)
-
-                if '签到成功' in sign_button.text:
+                    # if '签到成功' in sign_button.text:
+                    assets = r.html.search('class="erphpdown-sc-td-title">{}</td> <td>{}</td>')
                     res += f"<b><span style='color: green'>签到成功</span></b>\n{assets[0]}： {assets[1]}"
 
         finally:
@@ -78,5 +80,5 @@ if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("YPOJIE", [])
     result = Get(check_items=_check_items).main()
-    # send("亿破姐", result)
-    print(result)
+    send("亿破姐", result)
+    # print(result)

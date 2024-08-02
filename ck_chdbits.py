@@ -57,14 +57,15 @@ class Get:
         try:
             with HTMLSession(executablePath='/usr/bin/chromium') as s:
                 countdown()
-                r = s.get(url, headers={"Cookie": cookie}, timeout=10)
-                if not '欢迎回来' in r.text:
+                r = s.get(url, headers=headers)
+                question_id = r.html.search('name="questionid" value="{}"')
+                question_id = question_id[0] if question_id else None
+                if question_id is None:
                     return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
                 if '签过到了' in r.text:
                     qd_msg = re.findall(r'<font color="white">(.*?签到.*?)</font>', r.text)[0]
                 else:
-                    question_id = r.html.search('name="questionid" value="{}"')[0]
                     answer = answers.get(question_id)
                     if not answer or check_answer_values(answer):
                         x = 1 if answer else 2
