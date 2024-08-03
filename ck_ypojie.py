@@ -16,63 +16,50 @@ class Get:
 
     @staticmethod
     def sign(username, password, i):
-        res = ''
+        s, res, url = HTMLSession(), '', 'https://www.ypojie.com'
         try:
-            with HTMLSession(executablePath='/usr/bin/chromium') as s:
-                res = ''
-                headers= {
-                    'authority': 'www.ypojie.com',
-                    'origin': 'https://www.ypojie.com',
-                    # 'cookie': 'wordpress_test_cookie=WP%20Cookie%20check',
-                }
+            headers= {'origin': url, 'authority': 'www.ypojie.com'}
+            data = {
+                'log': username,
+                'pwd': password,
+                'wp-submit': '登录',
+                'rememberme': 'forever',
+                'redirect_to': f'{url}/?cf=1',
+            }
+            p = s.post(f'{url}/wp-login.php', headers=headers, data=data)
 
-                data = {
-                    'log': username,
-                    'pwd': password,
-                    'wp-submit': '登录',
-                    'rememberme': 'forever',
-                    'redirect_to': 'https://www.ypojie.com/?cf=1',
-                    # 'testcookie': '1',
-                }
+            name = p.html.search('> Hi, {} <')
+            name = name[0] if name else None
+            if name is None:
+                return f'账号{i}登录不成功，用户名或密码可能错误。'
 
-                p = s.post('https://www.ypojie.com/wp-login.php', headers=headers, data=data)
+            headers['referer'] = f'{url}/vip'
+            headers['accept'] = 'application/json, text/javascript, */*; q=0.01'
+            r = s.post(f'{url}/wp-admin/admin-ajax.php', headers=headers, data={'action': 'epd_checkin'})
+            color, msg = 'red', '签到失败'
+            if 'status' in r.json():
+                status = r.json()['status']
+                if 200 <= status < 300:
+                    color = 'green'
+                if 'msg' in r.json():
+                    msg = r.json()['msg']
+            sign_msg = f'<b><span style="{color}">{msg}</span></b>'
 
-                if '登录 ‹ 易破解' in p.text:
-                    return f'账号{i}登录不成功，用户名或密码可能错误。'
+            r = s.get(f'{url}/vip')
+            assets = r.html.search('class="erphpdown-sc-td-title">{}</td> <td>{}</td>')
+            res = f"---- {name} 亿破姐 签到结果 ----\n"
+            res += f"{sign_msg}\n{assets[0]}： {assets[1]}"
 
-                r = s.get('https://www.ypojie.com/vip')
-                name = r.html.search('> Hi, {} <')
-                res = f"---- {name[0]} 亿破姐 签到结果 ----\n"
-                assets = r.html.search('class="erphpdown-sc-td-title">{}</td> <td>{}</td>')
-                # <a href="javascript:;" class="usercheck erphpdown-sc-btn active">已签到</a>
-                # <a href="javascript:;" class="usercheck erphpdown-sc-btn erphp-checkin">今日签到</a>
-                # <a href="javascript:;" class="usercheck erphpdown-sc-btn erphp-checkin disabled active">签到成功</a>
-                sign_button = r.html.find('a.usercheck.erphpdown-sc-btn', first=True)
-
-                if '已签到' in sign_button.text:
-                    res += f"<b><span style='color: green'>今天已经签到</span></b>\n{assets[0]}： {assets[1]}"
-                else:
-                    headers['referer'] = 'https://www.ypojie.com/vip'
-                    headers['accept'] = 'application/json, text/javascript, */*; q=0.01'
-                    r = s.post('https://www.ypojie.com/wp-admin/admin-ajax.php', headers=headers, data={'action': 'epd_checkin'})
-                    sleep(5)
-                    print(r.html.html)
-                    # sign_button = r.html.find('a.usercheck.erphpdown-sc-btn', first=True)
-
-                    # if '签到成功' in sign_button.text:
-                    assets = r.html.search('class="erphpdown-sc-td-title">{}</td> <td>{}</td>')
-                    res += f"<b><span style='color: green'>签到成功</span></b>\n{assets[0]}： {assets[1]}"
-
+        except Exception as e:
+            res = f'发生错误：{str(e)}'
         finally:
-            pass
+            s.close()
         return res
 
     def main(self):
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
-            username = check_item.get("username")
-            password = check_item.get("password")
-            msg = self.sign(username, password, i)
+            msg = self.sign(check_item.get("username"), check_item.get("password"), i)
             msg_all += f'{msg}\n\n'
         return msg_all
 

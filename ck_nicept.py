@@ -4,9 +4,7 @@ cron: 55 59 11,23 * * *
 new Env('nicept');
 """
 
-import re
-import time
-import requests
+import re, time, requests
 from notify_mtr import send
 from utils import get_data
 from datetime import datetime, timedelta
@@ -26,7 +24,6 @@ class nicept:
                 time.sleep(sleep_seconds)
 
         session = requests.session()
-        url = 'https://www.nicept.net/attendance.php'
         headers = {
             "Cookie": cookie,
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) "
@@ -35,44 +32,40 @@ class nicept:
         }
 
         countdown()
-        r = session.get(url, headers=headers)
+        r = session.get('https://www.nicept.net/attendance.php', headers=headers)
         now_time = datetime.now().time()
-
-        if "登錄" in r.text:
+        name = re.findall(r'<b>(.*?)</b>', r.text)
+        name = name[0] if name else None
+        if name is None:
             return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
+        sign_msg = f"<b><span style='color: green'>签到成功。</span></b> {now_time}"
         if "簽到成功" not in r.text:
-            return "<b><span style='color: red'>签到失败</span></b>"
+            sign_msg = "<b><span style='color: red'>签到失败</span></b>"
 
-        name = re.findall(r'<b>(.*?)</b>', r.text, re.DOTALL)
-        details_pattern = r'<p>(這是您的第.*?個魔力值。).*?(今日簽到排名：.*?)</span>'
-        details = re.findall(details_pattern, r.text, re.DOTALL)
-        msg = f'{details[0][0]}{details[0][1]}\n'
+        details = re.findall(r'<p>(這是您的第.*?個魔力值。).*?(今日簽到排名：.*?)</span>', r.text)[0]
+        msg = f'{details[0]}{details[1]}\n'
+        pattern = (r'魔力值.*?\]:\s*(.*?)\s*<a.*?'
+                   r'分享率：</font>\s*([\d.]+)\s*.*?'
+                   r'上傳量：</font>\s*([\d.]+\s*[A-Z]+).*?'
+                   r'下載量：</font>\s*([\d.]+\s*[A-Z]+).*?'
+                   r'當前做種.*?>\s*(\d+)\s*<img')
+        result = re.findall(pattern, r.text, re.DOTALL)[0]
+        msg += (f'\n<b>账户信息：</b>\n'
+                f'魔力值：{result[0]}\n'
+                f'分享率：{result[1]}\n'
+                f'上传量：{result[2]}\n'
+                f'下载量：{result[3]}\n'
+                f'当前做种：{result[4]}\n')
 
-        account_pattern = r'魔力值.*?\]:\s*(.*?)\s*<a.*?分享率：</font>\s*([\d.]+)\s*.*?上傳量：</font>\s*([\d.]+\s*[A-Z]+).*?下載量：</font>\s*([\d.]+\s*[A-Z]+).*?"當前做種".*?>\s*(\d+)\s*<img'
-        account_info = re.findall(account_pattern, r.text, re.DOTALL)
-        
-        if account_info:
-            result = account_info[0]
-            msg += (f'\n<b>账户信息：</b>\n'
-                   f'魔力值：{result[0]}\n'
-                   f'分享率：{result[1]}\n'
-                   f'上传量：{result[2]}\n'
-                   f'下载量：{result[3]}\n'
-                   f'当前做种：{result[4]}\n'
-            )
-
-        res = f"---- {name[0]} nicept 签到结果 ----\n"
-        res += f"<b><span style='color: green'>签到成功。</span></b> {now_time}\n{msg}"
-
+        res = f"---- {name} nicept 签到结果 ----\n"
+        res += f"{sign_msg}\n{msg}"
         return res
 
     def main(self):
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
-            cookie = check_item.get("cookie")
-            msg = self.sign(cookie, i)
-            msg_all += msg + "\n\n"
+            msg_all += f'{self.sign(check_item.get("cookie"), i)}\n\n'
         return msg_all
 
 if __name__ == "__main__":

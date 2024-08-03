@@ -21,16 +21,6 @@ class Get:
 
     @staticmethod
     def sign(cookie, i):
-        valid_values = ('1', '2', '4', '8')
-        p, x, msg, res, cg_msg = None, '', '', '', ''
-        url = 'https://ptchdbits.co/bakatest.php'
-        headers = {
-            "Cookie": cookie,
-            'authority': 'ptchdbits.co',
-            'origin': 'https://ptchdbits.co',
-            'referer': 'https://ptchdbits.co/bakatest.php',
-        }
-
         def countdown():
             now = datetime.now()
             if now.hour == 23 and 57 <= now.minute <= 59:
@@ -54,6 +44,13 @@ class Get:
                 return sample(valid_values, 3)
             return choice(valid_values)
 
+        valid_values = ('1', '2', '4', '8')
+        p, x, msg, res, cg_msg = None, '', '', '', ''
+        url = 'https://ptchdbits.co/bakatest.php'
+        headers = {'referer': url, 'Cookie': cookie,
+                   'authority': 'ptchdbits.co',
+                   'origin': 'https://ptchdbits.co'}
+
         try:
             with HTMLSession(executablePath='/usr/bin/chromium') as s:
                 countdown()
@@ -71,12 +68,10 @@ class Get:
                         x = 1 if answer else 2
                         answer = generate_answer(r, answer)
 
-                    data = {
-                        'choice[]': answer,
-                        'questionid': question_id,
-                        'usercomment': '此刻心情:无',
-                        'wantskip': '不会',
-                    }
+                    data = {'choice[]': answer,
+                            'wantskip': '不会',
+                            'questionid': question_id,
+                            'usercomment': '此刻心情:无'}
                     p = s.post(url, headers=headers, data=data)
 
                     now_time = datetime.now().time()
@@ -113,20 +108,24 @@ class Get:
                     elif not '签过到了' in qd_msg:
                         cg_msg = "<b><span style='color: red'>签到失败</span></b>\n"
 
-                name = re.findall(r"class='UltimateUser_Name'><b>(.*?)</b>", r.text, re.DOTALL)[0]
-                res = f"--- {name} CHDBits 签到结果 ---\n{cg_msg}"
-                res += f"<b><span style='color: {'purple' if '签过到了' in qd_msg else 'orange'}'>{qd_msg}</span></b>\n\n{msg}"
-                pattern = r'使用</a>]: (.*?)\s*<font.*?分享率：</font>\s*(.*?)\s*<font.*?上传量：</font>\s*(.*?)\s*<font.*?下载量：</font>\s*(.*?)\s*<font.*?当前做种.*?>\s*(\d+)\s*<img.*?做种积分: </font>(.*?)</span>'
-                text_to_search = p.text if p else r.text if r else ''
-                result = re.findall(pattern, text_to_search, re.DOTALL)[0]
-                res += (f'<b>账户信息</b>\n'
-                       f'魔力值：{result[0]}\n'
-                       f'分享率：{result[1]}\n'
-                       f'上传量：{result[2]}\n'
-                       f'下载量：{result[3]}\n'
-                       f'当前做种：{result[4]}\n'
-                       f'做种积分：{result[5]}'
-                )
+                pattern = (r'UltimateUser_Name\'><b>(.*?)</b>.*?'
+                           r'使用</a>]: (.*?)\s*'
+                           r'<font.*?分享率：</font>\s*(.*?)\s*'
+                           r'<font.*?上传量：</font>\s*(.*?)\s*'
+                           r'<font.*?下载量：</font>\s*(.*?)\s*'
+                           r'<font.*?当前做种.*?(\d+).*?<font.*?'
+                           r'做种积分: </font>\s*(.*?)</')
+                text_search = p.text if p else r.text
+                result = re.findall(pattern, text_search, re.DOTALL)[0]
+                res = f"--- {result[0]} CHDBits 签到结果 ---\n{cg_msg}"
+                res += f"<b><span style='color: {'purple' if '签过到了' in qd_msg else 'orange'}'>{qd_msg}</span></b>\n\n"
+                res += (f'{msg}<b>账户信息</b>\n'
+                        f'魔力值：{result[1]}\n'
+                        f'分享率：{result[2]}\n'
+                        f'上传量：{result[3]}\n'
+                        f'下载量：{result[4]}\n'
+                        f'当前做种：{result[5]}\n'
+                        f'做种积分：{result[6]}')
 
         except Exception as e:
             res = f"发生异常: {e}"

@@ -27,7 +27,8 @@ class znds:
                 return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
             formhash = re.findall(r'action=logout&amp;formhash=(\w+)">退出', r.text)
-            sign_url = f'{url}plugin.php?id=ljdaka:daka&action=msg&formhash={formhash[0]}&infloat=yes&handlekey=ljdaka&inajax=1&ajaxtarget=fwin_content_ljdaka'
+            sign_url = (f'{url}plugin.php?id=ljdaka:daka&action=msg&formhash={formhash[0]}&'
+                        'infloat=yes&handlekey=ljdaka&inajax=1&ajaxtarget=fwin_content_ljdaka')
 
             r = s.get(sign_url)
             msg = r.html.search('class="alert_info"><p>{}</p></div>')
@@ -55,8 +56,7 @@ class znds:
     def main(self):
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
-            cookie = check_item.get("cookie")
-            msg_all += f'{self.sign(cookie, i)}\n\n'
+            msg_all += f'{self.sign(check_item.get("cookie"), i)}\n\n'
         return msg_all
 
 if __name__ == "__main__":

@@ -4,16 +4,14 @@ cron: 6 0,20 * * *
 new Env('HDSky 签到');
 """
 
-import re
-import time
-import pytesseract
+import re, time, pytesseract
 from io import BytesIO
 from utils import get_data
 from notify_mtr import send
 from requests_html import HTMLSession
 from PIL import Image, ImageFilter, ImageEnhance
 
-class Get:
+class HDSky:
     def __init__(self, check_items):
         self.check_items = check_items
 
@@ -114,18 +112,21 @@ class Get:
                             print(f"识别到 {short_imagehash} 的验证码不符合要求。5 秒后重新获取验证。")
                             time.sleep(5)
 
-                name = re.findall(r"class='InsaneUser_Name'><b>(.*?)</b><", r.text, re.DOTALL)[0]
-                res = f"\n--- {name} HDSky 签到结果 ---\n{msg}"
-                res += f"<b><span style='color: {'purple' if '今天已经签到了' in cg_msg else 'orange'}'>{cg_msg}</span></b>\n\n"
-                pattern = r'使用</a>]: (.*?)\s*<font.*?分享率：</font>\s*(.*?)\s*<font.*?上传量：</font>\s*(.*?)\s*<font.*?下载量：</font>\s*(.*?)\s*<font.*?当前做种.*?>\s*(\d+)\s*<img'
+                pattern = (r'InsaneUser_Name\'><b>(.*?)</b>.*?'
+                           r'使用</a>]: (.*?)\s*'
+                           r'<font.*?分享率：</font>\s*(.*?)\s*'
+                           r'<font.*?上传量：</font>\s*(.*?)\s*'
+                           r'<font.*?下载量：</font>\s*(.*?)\s*'
+                           r'<font.*?当前做种.*?>\s*(\d+)\s*<img')
                 result = re.findall(pattern, r.text, re.DOTALL)[0]
+                res = f"--- {result[0]} HDSky 签到结果 ---\n{msg}"
+                res += f"<b><span style='color: {'purple' if '今天已经签到了' in cg_msg else 'orange'}'>{cg_msg}</span></b>\n\n"
                 res += (f'<b>账户信息</b>\n'
-                       f'魔力值：{result[0]}\n'
-                       f'分享率：{result[1]}\n'
-                       f'上传量：{result[2]}\n'
-                       f'下载量：{result[3]}\n'
-                       f'当前做种：{result[4]}'
-                )
+                       f'魔力值：{result[1]}\n'
+                       f'分享率：{result[2]}\n'
+                       f'上传量：{result[3]}\n'
+                       f'下载量：{result[4]}\n'
+                       f'当前做种：{result[5]}')
 
         except Exception as e:
             res = f"出现错误: {e}"
@@ -141,7 +142,7 @@ class Get:
 if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("HDSKY", [])
-    result = Get(check_items=_check_items).main()
+    result = HDSky(check_items=_check_items).main()
     # print(result)
     if '今天已经签到了' in result:
         print(result)
