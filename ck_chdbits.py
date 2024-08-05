@@ -35,9 +35,9 @@ class Get:
 
         def generate_answer(r, value):
             if value:
-                match = re.search(rf"<input[^>]*value='(\d+)'[^>]*>[^<]*{re.escape(value)}", r.text)
+                match = re.findall(rf"value='(\d+)'\s*>[^<]*{re.escape(value)}", r.text)
                 if match:
-                    return match.group(1)
+                    return match[0]
 
             from random import choice, sample
             if '[多选]' in r.text:
@@ -75,14 +75,14 @@ class Get:
                     p = s.post(url, headers=headers, data=data)
 
                     now_time = datetime.now().time()
-                    question = re.findall(r'\](\[.*?选\]).*?请问：(.*?)</td></tr>', r.text)[0]
-                    form_tag = r.html.find('form', first=True)
-                    question_text = form_tag.find('td')[1].text.strip()
-                    msg = f'<b>题目 {question_id}</b>\n选择题{question[0]}：{question[1]}\n{question_text}\n\n'
+                    question = re.findall(r'\](\[.选\])\s*请问：(.*?)</td>', r.text)[0]
+                    table_tag = r.html.find('table[border="1"]', first=True)
+                    question_text = table_tag.find('td')[1].text.strip()
+                    msg = f'<b>题目 {question_id}</b>\n{question[0]}：{question[1]}\n{question_text}\n\n'
                     g = '使用数值答题'
                     if x:
                         g = f'{"使用题目答题" if x == 1 else "使用随机答题"}：{answer}'
-                        tr_tags = form_tag.find('tr')[:2]
+                        tr_tags = table_tag.find('tr')[:2]
                         with open('/tmp/chdbits_非数值答案题目.html.txt', 'a', encoding='utf-8') as file:
                             for tr in tr_tags:
                                 file.write(tr.html + '\n')
@@ -142,5 +142,5 @@ if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("CHDBITS", [])
     result = Get(check_items=_check_items).main()
-    send("CHDBits 签到信息", result)
+    send("CHDBits 签到", result)
     # print(result)

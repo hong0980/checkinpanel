@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 cron: 55 59 11,23 * * *
-new Env('nicept');
+new Env('NicePT 签到');
 """
 
 import re, time, requests
@@ -9,7 +9,7 @@ from notify_mtr import send
 from utils import get_data
 from datetime import datetime, timedelta
 
-class nicept:
+class NicePT:
     def __init__(self, check_items):
         self.check_items = check_items
 
@@ -58,7 +58,7 @@ class nicept:
                 f'下载量：{result[3]}\n'
                 f'当前做种：{result[4]}\n')
 
-        res = f"---- {name} nicept 签到结果 ----\n"
+        res = f"---- {name} NicePT 签到结果 ----\n"
         res += f"{sign_msg}\n{msg}"
         return res
 
@@ -71,6 +71,6 @@ class nicept:
 if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("NICEPT", [])
-    result = nicept(check_items=_check_items).main()
-    send("nicept", result)
+    result = NicePT(check_items=_check_items).main()
+    send("NicePT 签到", result)
     # print(result)

@@ -34,8 +34,8 @@ class znds:
             msg = r.html.search('class="alert_info"><p>{}</p></div>')
             sign_msg = "<b><span style='color: red'>签到失败</span></b>"
             if '获得' in msg[0]:
-                sign_msg = (f"<b><span style='color: green'>签到成功</span>\n"
-                            f"<span style='color: orange'>{msg[0]}</span></b>")
+                sign_msg = (f"<b><span style='color: green'>签到成功</span></b>\n"
+                            f"<b><span style='color: orange'>{msg[0]}</span></b>")
             elif '明日再来' in msg[0]:
                 sign_msg = f"<b><span style='color: orange'>{msg[0]}</span></b>"
 
@@ -63,5 +63,5 @@ if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("ZNDS", [])
     result = znds(check_items=_check_items).main()
-    send("智能电视网", result)
+    send("智能电视网  签到", result)
     # print(result)

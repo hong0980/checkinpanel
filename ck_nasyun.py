@@ -48,5 +48,5 @@ if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("NASYUN", [])
     result = nasyun(check_items=_check_items).main()
-    send("那是云", result)
+    send("那是云 签到", result)
     # print(result)

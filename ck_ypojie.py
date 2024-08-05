@@ -26,23 +26,26 @@ class Get:
                 'rememberme': 'forever',
                 'redirect_to': f'{url}/?cf=1',
             }
-            p = s.post(f'{url}/wp-login.php', headers=headers, data=data)
-
-            name = p.html.search('> Hi, {} <')
+            f = s.post(f'{url}/wp-login.php', headers=headers, data=data)
+            name = f.html.search('> Hi, {} <')
             name = name[0] if name else None
             if name is None:
                 return f'账号{i}登录不成功，用户名或密码可能错误。'
 
+            r = s.get(f'{url}/vip')
+            sign_button = r.html.find('a.usercheck.erphpdown-sc-btn', first=True)
+
             headers['referer'] = f'{url}/vip'
             headers['accept'] = 'application/json, text/javascript, */*; q=0.01'
-            r = s.post(f'{url}/wp-admin/admin-ajax.php', headers=headers, data={'action': 'epd_checkin'})
+            p = s.post(f'{url}/wp-admin/admin-ajax.php', headers=headers, data={'action': 'epd_checkin'})
             color, msg = 'red', '签到失败'
-            if 'status' in r.json():
-                status = r.json()['status']
-                if 200 <= status < 300:
+            if 'status' in p.json() and 'msg' in p.json():
+                status = p.json().get('status')
+                msg = p.json().get('msg')
+                if 200 <= status < 210:
                     color = 'green'
-                if 'msg' in r.json():
-                    msg = r.json()['msg']
+                if status == 200 and msg is None:
+                    msg = '签到成功'
             sign_msg = f'<b><span style="{color}">{msg}</span></b>'
 
             r = s.get(f'{url}/vip')
@@ -67,5 +70,5 @@ if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("YPOJIE", [])
     result = Get(check_items=_check_items).main()
-    send("亿破姐", result)
+    send("亿破姐 签到", result)
     # print(result)

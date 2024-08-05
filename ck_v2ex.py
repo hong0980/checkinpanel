@@ -40,7 +40,7 @@ class V2ex:
             if url is None:
                 return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
-            sign_msg  = f"<b><span style='color: green'>今天已经签到过了</span></b>"
+            sign_msg = f"<b><span style='color: green'>今天已经签到过了</span></b>"
             if 'once' in url:
                 s.get(f'https://www.v2ex.com{url}', verify=False)
                 sign_msg = f"<b><span style='color: green'>签到成功</span></b>"
@@ -75,5 +75,5 @@ if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("V2EX", [])
     result = V2ex(check_items=_check_items).main()
-    send("V2EX", result)
+    send("V2EX 签到", result)
     # print(result)

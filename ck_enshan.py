@@ -53,5 +53,5 @@ if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("ENSHAN", [])
     result = Enshan(check_items=_check_items).main()
-    send("恩山论坛", result)
+    send("恩山论坛 签到", result)
     # print(result)
