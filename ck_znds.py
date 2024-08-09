@@ -31,13 +31,14 @@ class znds:
                         'infloat=yes&handlekey=ljdaka&inajax=1&ajaxtarget=fwin_content_ljdaka')
 
             r = s.get(sign_url)
-            msg = r.html.search('class="alert_info"><p>{}</p></div>')
+            msg = r.html.search('class="alert_info"><p>{}</p></div>')[0]
+            msg = re.sub(r'</p><p>', '\n', msg) if '</p><p>' in msg else msg
             sign_msg = "<b><span style='color: red'>签到失败</span></b>"
-            if '获得' in msg[0]:
+            if '获得' in msg:
                 sign_msg = (f"<b><span style='color: green'>签到成功</span></b>\n"
-                            f"<b><span style='color: orange'>{msg[0]}</span></b>")
-            elif '明日再来' in msg[0]:
-                sign_msg = f"<b><span style='color: orange'>{msg[0]}</span></b>"
+                            f"<b><span style='color: orange'>{msg}</span></b>")
+            elif '明日再来' in msg:
+                sign_msg = f"<b><span style='color: orange'>{msg}</span></b>"
 
             f = s.get(f'{url}home.php?mod=spacecp&ac=credit')
             pattern = r'<em>\s*(金币|积分|威望|Z币):\s*</em>(\d+)'

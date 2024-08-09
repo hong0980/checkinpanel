@@ -46,7 +46,7 @@ class Get:
                     color = 'green'
                 if status == 200 and msg is None:
                     msg = '签到成功'
-            sign_msg = f'<b><span style="{color}">{msg}</span></b>'
+            sign_msg = f"<b><span style='color: {color}'>{msg}</span></b>"
 
             r = s.get(f'{url}/vip')
             assets = r.html.search('class="erphpdown-sc-td-title">{}</td> <td>{}</td>')

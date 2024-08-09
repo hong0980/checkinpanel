@@ -78,7 +78,8 @@ class Get:
                     question = re.findall(r'\](\[.选\])\s*请问：(.*?)</td>', r.text)[0]
                     table_tag = r.html.find('table[border="1"]', first=True)
                     question_text = table_tag.find('td')[1].text.strip()
-                    msg = f'<b>题目 {question_id}</b>\n{question[0]}：{question[1]}\n{question_text}\n\n'
+                    msg = (f'<b><span style="color: orange">题目 {question_id}</span></b>\n'
+                           f'{question[0]}：{question[1]}\n{question_text}\n\n')
                     g = '使用数值答题'
                     if x:
                         g = f'{"使用题目答题" if x == 1 else "使用随机答题"}：{answer}'
@@ -88,7 +89,7 @@ class Get:
                                 file.write(tr.html + '\n')
                             file.write('\n')
 
-                    msg += f"<b><span style='color: {'purple' if '数值' in g else 'red'}'>{g}</span></b>\n"
+                    msg += f"<b><span style='color: {'orange' if '数值' in g else 'red'}'>{g}</span></b>\n"
                     for values in answer:
                         question_text = re.findall(rf"value='{values}'\s*>(.*?)<", r.text, re.DOTALL)[0]
                         question_text = re.sub(r"&nbsp;|&quot;", '', question_text)
@@ -119,7 +120,7 @@ class Get:
                 result = re.findall(pattern, text_search, re.DOTALL)[0]
                 res = f"--- {result[0]} CHDBits 签到结果 ---\n{cg_msg}"
                 res += f"<b><span style='color: {'purple' if '签过到了' in qd_msg else 'orange'}'>{qd_msg}</span></b>\n\n"
-                res += (f'{msg}<b>账户信息</b>\n'
+                res += (f'{msg}<b><span style="color: orange">账户信息</span></b>\n'
                         f'魔力值：{result[1]}\n'
                         f'分享率：{result[2]}\n'
                         f'上传量：{result[3]}\n'

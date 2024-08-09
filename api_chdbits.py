@@ -4,30 +4,24 @@ cron: 30 15,19 * * *
 new Env('chdbits 最新电影信息');
 """
 
-import re
+import re, requests
 from utils import get_data
 from notify_mtr import send
-from bs4 import BeautifulSoup
-from requests_html import HTMLSession
+from bs4 import BeautifulSoup as BS
 
 class Get:
     def __init__(self, check_items):
         self.check_items = check_items
 
     @staticmethod
-    def sign(cookie, Movies_quantity):
+    def sign(cookie, Movies_quantity, i):
         res = ''
-        movie_info_string = ''
+        headers = {"Cookie": cookie}
         movie_info = f'<b>（2）当前最新的 {Movies_quantity} 部信息：</b>\n'
-        url = 'https://ptchdbits.co/torrents.php'
-        headers = {
-            "Cookie": cookie,
-        }
-        response = HTMLSession().get(url, headers=headers)
-        soup = BeautifulSoup(response.text, "html.parser")
+        r = requests.get('https://ptchdbits.co/torrents.php', headers=headers)
+        soup = BS(r.text, "html.parser")
 
-        if "欢迎回来" in response.text:
-            name = soup.find_all('a', class_='UltimateUser_Name')[0].text
+        if "欢迎回来" in r.text:
             Movieslist = soup.find_all('tr', class_='thirtypercentdown_bg')
             for i, tag in enumerate(Movieslist):
                 if i % 2 == 1:
@@ -36,16 +30,15 @@ class Get:
             Movieslist = soup.find_all('tr', class_='thirtypercentdown_bg')
             for sequence, Moviesinfo in enumerate(Movieslist[:int(Movies_quantity)], start=1):
                 category = Moviesinfo.img.get('title')
-                movie_link = Moviesinfo.find('a', title=True)['href']
-                movie_name = Moviesinfo.find('a', title=True)['title']
-                chinese_name = ' '.join(Moviesinfo.find('font', class_='subtitle').stripped_strings)
-                upload_time = Moviesinfo.find('span')['title']
                 Limited_time = Moviesinfo.find('span').text
+                upload_time = Moviesinfo.find('span')['title']
                 td_tags = Moviesinfo.find_all('td', class_='rowfollow')
                 data = [td.get_text(strip=True) for td in td_tags]
                 time, size, seeders, leechers, snatched = data[3:8]
                 imdb_img = Moviesinfo.find('img', src="pic/imdb.gif")
+                movie_name = Moviesinfo.find('a', title=True)['title']
                 imdb_rating = imdb_img.find_next_sibling(string=True).strip() if imdb_img else ''
+                chinese_name = ' '.join(Moviesinfo.find('font', class_='subtitle').stripped_strings)
 
                 movie_info += (f"<b>{sequence}):</b>\n【{category}】："
                                f"<b><span style='color:red'>{chinese_name}</span>"
@@ -59,28 +52,32 @@ class Get:
                                f"【 下载数 】: {leechers}\n"
                                f"【 完成数 】: {snatched}\n")
 
-            pattern = r'使用</a>]: (.*?)\s*<font.*?分享率：</font>\s*(.*?)\s*<font.*?上传量：</font>\s*(.*?)\s*<font.*?下载量：</font>\s*(.*?)\s*<font.*?当前做种.*?>\s*(\d+)\s*<img.*?做种积分: </font>(.*?)</span>'
-            result = re.findall(pattern, response.text, re.DOTALL)[0]
-            res = (f'<b>（1）{name} 账户信息：</b>\n'
-                   f'魔力值：{result[0]}\n'
-                   f'分享率：{result[1]}\n'
-                   f'上传量：{result[2]}\n'
-                   f'下载量：{result[3]}\n'
-                   f'当前做种：{result[4]}\n'
-                   f'做种积分：{result[5]}\n'
-                   f'{movie_info}')
+            pattern = (r'UltimateUser_Name\'><b>(.*?)</b>.*?'
+                       r'使用</a>]: (.*?)\s*'
+                       r'<font.*?分享率：</font>\s*(.*?)\s*'
+                       r'<font.*?上传量：</font>\s*(.*?)\s*'
+                       r'<font.*?下载量：</font>\s*(.*?)\s*'
+                       r'<font.*?当前做种.*?(\d+).*?<font.*?'
+                       r'做种积分: </font>\s*(.*?)</')
+            result = re.findall(pattern, r.text, re.DOTALL)[0]
+            res = (f'<b>（1）{result[0]} 账户信息：</b>\n'
+                   f'魔力值：{result[1]}\n'
+                   f'分享率：{result[2]}\n'
+                   f'上传量：{result[3]}\n'
+                   f'下载量：{result[4]}\n'
+                   f'当前做种：{result[5]}\n'
+                   f'做种积分：{result[6]}\n'
+                   f'\n{movie_info}')
         else:
-            res = "Cookie 失效"
+            res = f'账号({i})无法登录！可能Cookie失效，请重新修改'
         return res
 
     def main(self):
-        msg_all = ""
+        msg_all = ''
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = check_item.get("cookie")
             Movies_quantity = check_item.get("Movies_quantity")
-            sign_msg = self.sign(cookie, Movies_quantity)
-            msg = f"{sign_msg}"
-            msg_all += msg + "\n\n"
+            msg_all += f'{self.sign(cookie, Movies_quantity, i)}\n\n'
         return msg_all
 
 if __name__ == "__main__":

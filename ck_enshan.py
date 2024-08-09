@@ -4,10 +4,10 @@ cron: 2 0 * * *
 new Env('恩山论坛 签到');
 """
 
-import re
-import requests
+import re, requests
 from utils import get_data
 from notify_mtr import send
+from datetime import datetime
 
 class Enshan:
     def __init__(self, check_items):
@@ -17,7 +17,6 @@ class Enshan:
     def sign(cookie, i):
         res = ""
         session = requests.session()
-        u = "https://www.right.com.cn/forum/home.php?mod=spacecp&ac=credit&showcredit=1"
         headers = {
             "Cookie": cookie,
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) "
@@ -25,14 +24,20 @@ class Enshan:
             "Chrome/102.0.0.0 Safari/537.36",
         }
         try:
-            r = session.get(u, headers=headers, timeout=10)
-            if not '退出' in r.text:
-                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
+            r = session.get("https://www.right.com.cn/forum/home.php?mod=spacecp&ac=credit&showcredit=1", headers=headers)
+            name = re.findall(r'访问我的空间">(.*?)</a>', r.text)
+            name = name[0] if name else None
+            if name is None:
+                return (f"<b><span style='color: red'>签到失败</span></b>\n"
+                        f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-            name = re.findall(r'访问我的空间">(.*?)</a>', r.text, re.DOTALL)
-            res = f"---- {name[0]} 恩山论坛 签到结果 ----\n"
+            r = session.get('https://www.right.com.cn/forum/home.php?mod=spacecp&ac=credit', headers=headers)
+            today = re.findall(rf'<td>{datetime.now().strftime("%Y-%m-%d")}.*?</td>', r.text)
+            sign_msg = f"<b><span style='color: red'>签到失败</span></b>" \
+            if not today else "<b><span style='color: green'>签到成功</span></b>"
             pattern = r'<em>\s*(恩山币|积分|贡献):\s*</em>(\d+)'
             matches = re.findall(pattern, r.text)
+            res = f"---- {name} 恩山论坛 签到结果 ----\n{sign_msg}\n\n<b>账户信息</b>\n"
             res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
 
         except Exception as e:

@@ -20,7 +20,7 @@ class gebi1:
         def countdown():
             now = datetime.now()
             if now.hour == 23 and 57 <= now.minute <= 59:
-                midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1, seconds=2)
+                midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1, seconds=0.2)
                 sleep_seconds = (midnight - now).total_seconds()
                 print(f'等待{int(sleep_seconds)}秒后执行签到！')
                 time.sleep(sleep_seconds)
@@ -37,12 +37,12 @@ class gebi1:
 
                 sign_msg = f"<b><span style='color: green'>今日已签到</span></b>\n"
                 JD_sign = r.html.find('a#JD_sign', first=True)
+                # formhash = re.findall(r'<a.*?action=logout&amp;formhash=(\w+)".*?>退出登录</a>', r.text)[0]
+                # sign_url = f'{url}&operation=qiandao&formhash={formhash}&format=empty'
 
                 if JD_sign:
-                    sign_link = f"https://www.gebi1.com/{JD_sign.attrs['href']}"
-                    s.get(sign_link)
+                    s.get(f"https://www.gebi1.com/{JD_sign.attrs['href']}")
                     now_time = datetime.now().time()
-                    # time.sleep(2)
                     r = s.get(url)
                     if not r.html.find('a#JD_sign', first=True):
                         sign_msg = f"<b><span style='color: green'>签到成功</span></b> {now_time}\n"
