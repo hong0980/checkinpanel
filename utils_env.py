@@ -18,33 +18,33 @@ def get_env_str() -> str:
         return ENV
 
     v2p_file = "/usr/local/app/script/Lists/task.list"
-    ql_new_file = "/ql/data/config/env.sh"
+    ql_new_file = "/ql/data/config/token.json"
     ql_file = "/ql/config/env.sh"
 
-    print("尝试检查运行环境...")
+   # print("尝试检查运行环境...")
     if os.getenv("GITHUB_ACTIONS"):
-        print("成功，当前环境为: github action 面板。")
+        # print("当前环境为: github action 面板。")
         env = "github"
     elif os.path.exists(v2p_file):
-        print("成功，当前环境为: elecV2P 面板。")
+        # print("当前环境为: elecV2P 面板。")
         env = "v2p"
     elif os.path.exists(ql_new_file):
-        print("成功，当前环境为: 青龙面板(v2.12.0+)。")
+        # print("当前环境为: 青龙面板(v2.12.0+)。")
         env = "ql_new"
     elif os.path.exists(ql_file):
-        print("成功，当前环境为: 青龙面板。")
+        # print("当前环境为: 青龙面板。")
         env = "ql"
 
     # 面板判断优先于系统判断
     elif (e := platform.system()) == "Windows" or "Linux" or "Darwin":
-        print(f"成功，当前环境为 {e}。")
+        print(f"当前环境为 {e}。")
         env = e
     else:
         print("失败！请检查环境。")
         env = ""
 
     ENV = env
-    print("环境检查结束。\n")
+    # print("环境检查结束。\n")
     return env
 
 
@@ -78,7 +78,7 @@ def get_file_path(file_name: str) -> str:
     :return: 如果有面板，返回面板默认配置文件夹，否则返回当前目录下文件。 <br/> 如果路径下文件不存在，返回空串。
     """
     env_i = get_env_int()
-    print(f"配置文件 ({file_name}) 检查开始...")
+    # print(f"配置文件 ({file_name}) 检查开始...")
     paths = [
         file_name,
         file_name,
@@ -93,9 +93,9 @@ def get_file_path(file_name: str) -> str:
         print("无法判断环境，选择当前目录为配置文件夹目录。")
         env_i = 0
     if not os.path.exists(paths[env_i]):
-        print(f"未找到配置文件（不一定是错误），路径为: {paths[env_i]}。")
-        print("配置文件检查结束。\n")
+        # print(f"未找到配置文件（不一定是错误），路径为: {paths[env_i]}。")
+        # print("配置文件检查结束。\n")
         return ""
-    print(f"在 {paths[env_i]} 发现配置文件。")
-    print("配置文件检查结束。\n")
+    # print(f"在 {paths[env_i]} 发现配置文件。\n")
+    # print("配置文件检查结束。\n")
     return paths[env_i]

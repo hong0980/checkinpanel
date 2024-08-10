@@ -1,104 +1,79 @@
 # -*- coding: utf-8 -*-
 """
-cron: 10 19 * * *
-new Env('V2EX');
+cron: 10 9,15 * * *
+new Env('V2EX 签到');
 """
 
-import re
-
-import requests
-import urllib3
-
-from notify_mtr import send
+import re, urllib3
 from utils import get_data
-
+from notify_mtr import send
+from datetime import datetime
+from requests_html import HTML, HTMLSession
 urllib3.disable_warnings()
-
 
 class V2ex:
     def __init__(self, check_items):
         self.check_items = check_items
         self.url = "https://www.v2ex.com/mission/daily"
 
-    def sign(self, session):
-        msg = ""
+    def sign(self, cookie, proxy, i):
+        res = ''
+        try:
+            s = HTMLSession()
+            s.headers.update({
+                "referer": self.url,
+                "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "accept": "text/html,application/xhtml+xml,application/xml;"
+                "q=0.9,image/webp,image/apng,*/*;"
+                "q=0.8,application/signed-exchange;v=b3;q=0.9",
+            })
+            s.cookies.update({
+                item.split("=")[0]: item.split("=", 1)[1]
+                for item in cookie.split("; ")
+            })
+            if proxy:
+                s.proxies.update({"http": proxy, "https": proxy})
 
-        response = session.get(self.url, verify=False)
-        pattern = (
-            r"<input type=\"button\" class=\"super normal button\""
-            r" value=\".*?\" onclick=\"location\.href = \'(.*?)\';\" />"
-        )
-        urls = re.findall(pattern, response.text)
-        url = urls[0] if urls else None
-        if url is None:
-            return "cookie 可能过期"
-        if url != "/balance":
-            data = {"once": url.split("=")[-1]}
-            session.get(
-                f'https://www.v2ex.com{url.split("?")[0]}', verify=False, params=data
-            )
+            r = s.get(self.url, verify=False)
+            urls = r.html.search('onclick="location.href = \'{}\';" />')
+            url = urls[0] if urls else None
+            if url is None:
+                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
-        response = session.get("https://www.v2ex.com/balance", verify=False)
-        totals = re.findall(
-            r"<td class=\"d\" style=\"text-align: right;\">(\d+\.\d+)</td>",
-            response.text,
-        )
-        total = totals[0] if totals else "签到失败"
-        today = re.findall(
-            r'<td class="d"><span class="gray">(.*?)</span></td>', response.text
-        )
-        today = today[0] if today else "签到失败"
+            sign_msg = f"<b><span style='color: green'>今天已经签到过了</span></b>"
+            if 'once' in url:
+                s.get(f'https://www.v2ex.com{url}', verify=False)
+                sign_msg = f"<b><span style='color: green'>签到成功</span></b>"
+                r = s.get(self.url, verify=False)
+            username = r.html.find('span[class="bigger"]', first=True)
+            datas = re.findall(r'<div class="cell">(已连续登录 \d+ 天)</div>', r.text)
 
-        usernames = re.findall(
-            r"<a href=\"/member/.*?\" class=\"top\">(.*?)</a>", response.text
-        )
-        username = usernames[0] if usernames else "用户名获取失败"
+            p = s.get('https://www.v2ex.com/balance')
+            today = re.findall(rf'{datetime.now().strftime("%Y%m%d")}.*?(每日登录奖励 \d+ 铜币)</span>', p.text)
+            sign_msg = f"<b><span style='color: red'>签到失败</span></b>" if not today[0] else sign_msg
+            total = p.html.find('a.balance_area', first=True).text.replace(" ", "")
+            credit_info = f"{datas[0]}\n{today[0]}\n当前账户余额：{total} 铜币"
 
-        msg += f"帐号信息: {username}\n今日签到: {today}\n帐号余额: {total}"
+            res = (f"---- {username.text} V2EX 签到状态 ----"
+                   f'\n{sign_msg}\n{credit_info}')
 
-        response = session.get(url=self.url, verify=False)
-        datas = re.findall(r"<div class=\"cell\">(.*?)天</div>", response.text)
-        data = f"{datas[0]} 天" if datas else "获取连续签到天数失败"
-        msg += f"\n签到天数: {data}"
-
-        msg = msg.strip()
-        return msg
+        except Exception as e:
+            res = f"<b><span style='color: red'>未知异常：</span></b>\n{e}"
+        finally:
+            pass
+        return res
 
     def main(self):
         msg_all = ""
-        for check_item in self.check_items:
-            cookie = {
-                item.split("=")[0]: item.split("=")[1]
-                for item in check_item.get("cookie").split("; ")
-            }
-
-            session = requests.session()
-            if check_item.get("proxy", ""):
-                proxies = {
-                    "http": check_item.get("proxy", ""),
-                    "https": check_item.get("proxy", ""),
-                }
-                session.proxies.update(proxies)
-            session.cookies.update(cookie)
-            session.headers.update(
-                {
-                    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36",
-                    "referer": self.url,
-                    "accept": "text/html,application/xhtml+xml,application/xml;"
-                    "q=0.9,image/webp,image/apng,*/*;"
-                    "q=0.8,application/signed-exchange;v=b3;q=0.9",
-                    "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
-                }
-            )
-
-            msg = self.sign(session)
-            msg_all += msg + "\n\n"
+        for i, check_item in enumerate(self.check_items, start=1):
+            proxy = check_item.get("proxy", "")
+            cookie = check_item.get("cookie")
+            msg_all += f'{self.sign(cookie, proxy, i)}\n\n'
         return msg_all
-
 
 if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("V2EX", [])
     result = V2ex(check_items=_check_items).main()
-    send("V2EX", result)
+    send("V2EX 签到", result)
+    # print(result)

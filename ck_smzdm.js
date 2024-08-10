@@ -31,8 +31,8 @@ async function smzdm() {
         for (var i = 0; i < COOKIES_SMZDM.length; i++) {
             try {
                 $.index = i + 1;
-                content += '\n======== [Cookie ' + $.index + '] Start ======== \n';
-                magicJS.log('\n======== [Cookie ' + $.index + '] Start ======== ');
+                content += '\n======== [账户 ' + $.index + '] 开始 ======== \n';
+                magicJS.log('\n======== [账户 ' + $.index + '] 开始 ======== ');
                 let smzdmCookie = COOKIES_SMZDM[i].cookie;
                 // 任务完成情况
                 let clickGoBuyTimes = 0;
@@ -54,10 +54,10 @@ async function smzdm() {
                     );
 
                     // 每日抽奖
-                    let activeId = await GetLotteryActiveId(smzdmCookie);
-                    if (activeId) {
-                        content += await LotteryDraw(smzdmCookie, activeId);
-                    }
+                    // let activeId = await GetLotteryActiveId(smzdmCookie);
+                    // if (activeId) {
+                    //     content += await LotteryDraw(smzdmCookie, activeId);
+                    // }
 
                     // 获取去购买和好价Id列表
                     let [, [goBuyList = [], likProductList = []]] = await magicJS.attempt(magicJS.retry(GetProductList, 5, 1000)(), [[], []]);
@@ -176,8 +176,8 @@ async function smzdm() {
                 magicJS.logError(`执行任务出现异常：${err}`);
                 content += '❌执行任务出现，请查阅日志';
             }
-            content += '\n======== [Cookie ' + $.index + '] End  ======== \n';
-            magicJS.log('\n======== [Cookie ' + $.index + '] End  ======== \n');
+            content += '\n======== [账户 ' + $.index + '] 结束  ======== \n';
+            magicJS.log('\n======== [账户 ' + $.index + '] 结束  ======== \n');
             result.push(content);
         }
     }

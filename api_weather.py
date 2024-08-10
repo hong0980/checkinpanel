@@ -1,17 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-cron: 30 7 * * *
+cron: 35 7 * * *
 new Env('天气预报');
 """
 
 import json
-from os.path import dirname, join
-
 import requests
-
-from notify_mtr import send
+from os.path import dirname, join
+from bs4 import BeautifulSoup
 from utils import get_data
-
+from notify_mtr import send
 
 class Weather:
     def __init__(self, check_items):
@@ -20,52 +18,67 @@ class Weather:
     @staticmethod
     def city_map():
         cur_dir = dirname(__file__)
-        try:
-            with open(join(cur_dir, "city.json"), "r", encoding="utf-8") as city_file:
-                city_map = json.load(city_file)
-                if not city_map:
-                    raise FileNotFoundError
-        except FileNotFoundError as e:
-            r = requests.get(
-                "https://fastly.jsdelivr.net/gh/Oreomeow/checkinpanel@master/city.json"
-            )
-            if r.status_code != 200:
-                raise ConnectionError("下载 city.json 失败！") from e
-            city_map = r.json()
-            with open(join(cur_dir, "city.json"), "w", encoding="utf-8") as city_file:
-                json.dump(city_map, city_file, ensure_ascii=False)
+        with open(join(cur_dir, "city.json"), "r", encoding="utf-8") as city_file:
+            city_map = json.load(city_file)
+            if not city_map:
+                raise FileNotFoundError
         return city_map
 
     def main(self):
-        msg_all = ""
-        for city_name in self.check_items:
-            city_code = self.city_map().get(city_name, "101020100")
-            weather_url = f"http://t.weather.itboy.net/api/weather/city/{city_code}"
-            r = requests.get(weather_url)
-            if r.status_code == 200 and r.json().get("status") == 200:
-                d = r.json()
-                msg = (
-                    f'城市：{d["cityInfo"]["parent"]} {d["cityInfo"]["city"]}\n'
-                    f'日期：{d["data"]["forecast"][0]["ymd"]} {d["data"]["forecast"][0]["week"]}\n'
-                    f'天气：{d["data"]["forecast"][0]["type"]}\n'
-                    f'温度：{d["data"]["forecast"][0]["high"]} {d["data"]["forecast"][0]["low"]}\n'
-                    f'湿度：{d["data"]["shidu"]}\n'
-                    f'空气质量：{d["data"]["quality"]}\n'
-                    f'PM2.5：{d["data"]["pm25"]}\n'
-                    f'PM10：{d["data"]["pm10"]}\n'
-                    f'风力风向 {d["data"]["forecast"][0]["fx"]} {d["data"]["forecast"][0]["fl"]}\n'
-                    f'感冒指数：{d["data"]["ganmao"]}\n'
-                    f'温馨提示：{d["data"]["forecast"][0]["notice"]}\n'
-                    f'更新时间：{d["time"]}'
-                )
-            else:
-                msg = f"{city_name} 天气查询失败！"
-            msg_all += msg + "\n\n"
-        return msg_all
+        msg = ""
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/92.0.4515.131 Safari/537.36",
+        }
+        hlurl = f"https://wannianli.tianqi.com/laohuangli/"
+        hlresponse = requests.get(hlurl, headers=headers)
+        if hlresponse.status_code == 200:
+            hlsoup = BeautifulSoup(hlresponse.content, 'html.parser')
+            kalendar_date = hlsoup.find('div', class_='kalendar_top').find('h3').text.strip()
+            kalendar_date1 = hlsoup.find('div', class_='kalendar_top').find('h5').text.strip()
 
+            for city in self.check_items:
+                code = self.city_map().get(city)
+                print(code)
+                url = f"http://i.tianqi.com/?c=code&id=27&py={code}"
+                soup = BeautifulSoup(requests.get(url, headers=headers).content, 'html.parser')
+                boxes = soup.find_all('div', class_='box')
+
+                for box in boxes:
+                    summary = ""
+                    icon_url = f"<img src='{box.img['src']}' />"
+                    name = box.find('a').text.strip()
+                    temp = box.find('strong').text
+                    humidity = box.find_all('span')[1].text
+                    details = "\n".join([li.text for li in box.select('div.today_data_r01 li')][:6])
+                    description = box.find('li', class_='wtwt').text.strip()
+                    path = box.find('li', class_='wtpath').text.strip()
+                    wind = box.find('li', class_='wtwind').text.strip()
+                    future_weather_info = box.find_all('ul', class_='wltq')
+                    living_index = box.find_all('ul', class_='wltq3')
+
+                    for future_weather in future_weather_info:
+                        day = future_weather.find('a').text.strip()
+                        temperature = future_weather.find('li', class_='t2').text.strip()
+                        description_tag = future_weather.find('li', class_='t4')
+                        weather_description = description_tag.find_all('p')[0].text.strip()
+                        future_wind = description_tag.find_all('p')[1].text.strip()
+                        future_icon_url = f"<img src='{future_weather.img['src']}' />"
+                        summary += f"{day} {temperature} {future_wind} {weather_description} {future_icon_url}\n"
+
+                    msg += f"<b><span style='color: red'>{name} </span></b>今天\n{kalendar_date}\n{kalendar_date1}\n{path}{icon_url} {description} {wind}"
+                    msg += f"\n当前温度：{temp}\n{humidity}\n{details}\n\n{summary}"
+                msg += "\n"
+        else:
+            msg += f"请求失败\n"
+
+        return msg
 
 if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("CITY", [])
     result = Weather(check_items=_check_items).main()
     send("天气预报", result)
+    # print(result)
+

@@ -4,8 +4,8 @@ PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # 初始化变量
 V2P_FILE='/usr/local/app/script/Lists/task.list'
-QL_FILE='/ql/config/env.sh'
-QL_NEW_FILE='/ql/data/config/env.sh'
+QL_FILE='/ql/config'
+QL_NEW_FILE='/ql/data'
 IS_DISPLAY_CONTEXT=1
 
 # 检查环境：面板先于系统
@@ -13,9 +13,9 @@ IS_DISPLAY_CONTEXT=1
 check_env() {
     if [ -f "${V2P_FILE}" ]; then
         panel="elecv2p"
-    elif [ -f "${QL_NEW_FILE}" ]; then
+    elif [ -d "${QL_NEW_FILE}" ]; then
         panel="qinglong_new"
-    elif [ -f "${QL_FILE}" ]; then
+    elif [ -d "${QL_FILE}" ]; then
         panel="qinglong"
     else
         CMD="$(grep -i pretty_name /etc/os-release 2>/dev/null | cut -d \" -f2)
