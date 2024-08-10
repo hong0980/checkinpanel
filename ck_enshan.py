@@ -50,8 +50,7 @@ class Enshan:
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = str(check_item.get("cookie"))
-            msg = self.sign(cookie, i)
-            msg_all += msg + "\n\n"
+            msg_all += f'{self.sign(cookie, i)}\n\n'
         return msg_all
 
 if __name__ == "__main__":

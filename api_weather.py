@@ -31,18 +31,18 @@ class Weather:
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/92.0.4515.131 Safari/537.36",
         }
-        hlurl = f"https://wannianli.tianqi.com/laohuangli/"
-        hlresponse = requests.get(hlurl, headers=headers)
-        if hlresponse.status_code == 200:
-            hlsoup = BeautifulSoup(hlresponse.content, 'html.parser')
+        url = "https://wannianli.tianqi.com/laohuangli/"
+        p = requests.get(url, headers=headers)
+        if p.status_code == 200:
+            hlsoup = BeautifulSoup(p.content, 'html.parser')
             kalendar_date = hlsoup.find('div', class_='kalendar_top').find('h3').text.strip()
             kalendar_date1 = hlsoup.find('div', class_='kalendar_top').find('h5').text.strip()
 
             for city in self.check_items:
                 code = self.city_map().get(city)
-                print(code)
                 url = f"http://i.tianqi.com/?c=code&id=27&py={code}"
-                soup = BeautifulSoup(requests.get(url, headers=headers).content, 'html.parser')
+                r = requests.get(url, headers=headers)
+                soup = BeautifulSoup(r.content, 'html.parser')
                 boxes = soup.find_all('div', class_='box')
 
                 for box in boxes:
@@ -67,7 +67,8 @@ class Weather:
                         future_icon_url = f"<img src='{future_weather.img['src']}' />"
                         summary += f"{day} {temperature} {future_wind} {weather_description} {future_icon_url}\n"
 
-                    msg += f"<b><span style='color: red'>{name} </span></b>今天\n{kalendar_date}\n{kalendar_date1}\n{path}{icon_url} {description} {wind}"
+                    msg += (f"<b><span style='color: red'>{name} </span></b>今天\n"
+                            f"{kalendar_date}\n{kalendar_date1}\n{path}{icon_url} {description} {wind}")
                     msg += f"\n当前温度：{temp}\n{humidity}\n{details}\n\n{summary}"
                 msg += "\n"
         else:
@@ -81,4 +82,3 @@ if __name__ == "__main__":
     result = Weather(check_items=_check_items).main()
     send("天气预报", result)
     # print(result)
-

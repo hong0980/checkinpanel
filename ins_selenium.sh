@@ -12,9 +12,9 @@ py_reqs="pytesseract selenium-stealth PyVirtualDisplay undetected-chromedriver"
 alpine_pkgs="build-base tesseract-ocr-data-eng chromium chromium-chromedriver libexif eudev xvfb"
 
 install() {
-    local count=0 flag=$1 package="${2##* }"
+    local count=0 flag=$1
     while true; do
-        echo ".......... 开始安装 $package ........."
+        echo ".......... 开始安装 ${2##* } ........."
         local result=$3
         flag=$((result > 0 ? 0 : 1))
         if [ "$flag" -eq "$1" ]; then
@@ -22,18 +22,18 @@ install() {
             break
         else
             count=$((count + 1))
-            if [ "$count" -eq 6 ]; then
+            if [ "$count" -eq 3 ]; then
                 echo "!! 自动安装失败，请尝试进入容器后执行 $2 !!"
                 break
             fi
-            echo ".......... 5 秒后重试 ........."
-            sleep 5
+            echo ".......... 3 秒后重试 ........."
+            sleep 3
         fi
     done
 }
 
 install_alpine_pkgs() {
-    apk update
+    apk update >/dev/null 2>&1
     for pkg in $alpine_pkgs; do
         if apk info -e "$pkg" >/dev/null 2>&1; then
             echo "$pkg 已安装"

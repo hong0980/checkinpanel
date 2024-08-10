@@ -20,7 +20,7 @@ class gebi1:
         def countdown():
             now = datetime.now()
             if now.hour == 23 and 57 <= now.minute <= 59:
-                midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1, seconds=0.2)
+                midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
                 sleep_seconds = (midnight - now).total_seconds()
                 print(f'等待{int(sleep_seconds)}秒后执行签到！')
                 time.sleep(sleep_seconds)

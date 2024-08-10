@@ -23,14 +23,17 @@ class nasyun:
             "Chrome/102.0.0.0 Safari/537.36",
         }
         try:
-            r = session.get(url, headers=headers, timeout=10)
-            if '立即注册' in r.text:
+            r = session.get('http://www.nasyun.com/home.php', headers=headers)
+            print(r.text)
+            name = re.findall(r'title="访问我的空间" >(\w+)</a></div>', r.text)
+            name = name[0] if name else None
+            if name is None:
                 return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
-            name = re.findall(r'<a.*?\.html" target="_blank">(.*?)</a>', r.text, re.DOTALL)
-            res = f"---- {name[0]} 那是云 签到结果 ----\n"
+            r = session.get(url, headers=headers)
             pattern = r'<em>\s*(云币|贡献|活跃|积分):\s*</em>(\d+)'
             matches = re.findall(pattern, r.text)
+            res = f"---- {name} 那是云 签到结果 ----\n\n<b>账户信息</b>\n"
             res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
         except Exception as e:
             return f"发生异常: {e}"
@@ -40,8 +43,7 @@ class nasyun:
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = str(check_item.get("cookie"))
-            msg = self.sign(cookie, i)
-            msg_all += msg + "\n\n"
+            msg_all += f'{self.sign(cookie, i)}\n\n'
         return msg_all
 
 if __name__ == "__main__":

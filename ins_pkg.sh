@@ -18,9 +18,9 @@ alpine_pkgs="libffi-dev make openssl-dev perl-app-cpanminus perl-dev py3-pip"
 py_reqs="cryptography dateparser feedparser peewee pytest requests_html schedule tomli lxml_html_clean"
 
 install() {
-    local count=0 flag=$1 package="${2##* }"
+    local count=0 flag=$1
     while true; do
-        echo ".......... 开始安装 $package ........."
+        echo ".......... 开始安装 ${2##* } ........."
         local result=$3
         flag=$((result > 0 ? 0 : 1))
         if [ "$flag" -eq "$1" ]; then
@@ -28,18 +28,18 @@ install() {
             break
         else
             count=$((count + 1))
-            if [ "$count" -eq 6 ]; then
+            if [ "$count" -eq 3 ]; then
                 echo "!! 自动安装失败，请尝试进入容器后执行 $2 !!"
                 break
             fi
-            echo ".......... 5 秒后重试 ........."
-            sleep 5
+            echo ".......... 3 秒后重试 ........."
+            sleep 3
         fi
     done
 }
 
 install_alpine_pkgs() {
-    apk update
+    apk update >/dev/null 2>&1
     for pkg in $alpine_pkgs; do
         if apk info -e "$pkg" >/dev/null 2>&1; then
             echo "$pkg 已安装"
@@ -73,8 +73,8 @@ install_py_reqs() {
 
 install_js_pkgs_initial() {
     if [ -d "${SCR_PATH}/${checkinpanel_master}" ]; then
-        cd "${SCR_PATH}/${checkinpanel_master}" || return
-        cp "${REPO_PATH}/${checkinpanel_master}/package.json" "${SCR_PATH}/${checkinpanel_master}/package.json"
+        [ -f "${SCR_PATH}/${checkinpanel_master}/package.json" ] || \
+        cp -v "${REPO_PATH}/${checkinpanel_master}/package.json" "${SCR_PATH}/${checkinpanel_master}/package.json"
     elif [ -d "/ql/scripts" ] && [ ! -f "/ql/scripts/package.bak.json" ]; then
         cd /ql/scripts || return
         rm -rf node_modules .pnpm-store
@@ -99,25 +99,23 @@ install_js_pkgs_initial() {
                 });
             " || return
     fi
-    npm install || return
+    npm install >/dev/null 2>&1 || return
 }
 
 install_js_pkgs_all() {
     install_js_pkgs_initial
     for i in $js_pkgs; do
-        is_empty=$(npm ls "$i" | grep empty)
-        has_err=$(npm ls "$i" | grep ERR)
-        
-        if [ -z "$is_empty" ] && [ -z "$has_err" ]; then
+        if ! npm ls "$i" | grep -qE '(empty|ERR)'; then
             echo "$i 已正确安装"
         else
-            if [ -n "$has_err" ]; then
+            [ "$(npm ls "$i" | grep ERR)" ] && {
                 npm uninstall "$i"
                 rm -rf "$(pwd)/node_modules/$i"
                 rm -rf /usr/local/lib/node_modules/lodash/*
-                npm cache clear --force
-            fi
-            install 1 "npm install $i" "$(npm install --force "$i" && npm ls --force "$i" | grep -cE '(empty)|ERR')"
+                npm cache clean --force
+            }
+            install 1 "npm install $i" \
+            "$(npm install --force "$i" && npm ls "$i" | grep -qE '(empty|ERR)')"
         fi
     done
     npm ls --depth 0
@@ -133,7 +131,7 @@ install_pl_mods() {
             if [ -f ./cpm ]; then
                 chmod +x cpm && ./cpm --version
             else
-                cp -f /ql/repo/${checkinpanel_master}/cpm ./ && chmod +x cpm && ./cpm --version ||
+                cp -vf /ql/repo/${checkinpanel_master}/cpm ./ && chmod +x cpm && ./cpm --version ||
                 curl -fsSL https://cdn.jsdelivr.net/gh/Oreomeow/checkinpanel/cpm >cpm && chmod +x cpm && ./cpm --version
             fi
         fi
