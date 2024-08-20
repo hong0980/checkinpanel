@@ -4,12 +4,11 @@ cron: 10 9,15 * * *
 new Env('V2EX 签到');
 """
 
-import re, urllib3
+import re
 from utils import get_data
 from notify_mtr import send
 from datetime import datetime
-from requests_html import HTML, HTMLSession
-urllib3.disable_warnings()
+from requests_html import HTMLSession
 
 class V2ex:
     def __init__(self, check_items):
@@ -17,7 +16,6 @@ class V2ex:
         self.url = "https://www.v2ex.com/mission/daily"
 
     def sign(self, cookie, proxy, i):
-        res = ''
         try:
             s = HTMLSession()
             s.headers.update({
@@ -34,7 +32,7 @@ class V2ex:
             if proxy:
                 s.proxies.update({"http": proxy, "https": proxy})
 
-            r = s.get(self.url, verify=False)
+            r = s.get(self.url)
             urls = r.html.search('onclick="location.href = \'{}\';" />')
             url = urls[0] if urls else None
             if url is None:
@@ -42,9 +40,9 @@ class V2ex:
 
             sign_msg = f"<b><span style='color: green'>今天已经签到过了</span></b>"
             if 'once' in url:
-                s.get(f'https://www.v2ex.com{url}', verify=False)
+                s.get(f'https://www.v2ex.com{url}')
                 sign_msg = f"<b><span style='color: green'>签到成功</span></b>"
-                r = s.get(self.url, verify=False)
+                r = s.get(self.url)
             username = r.html.find('span[class="bigger"]', first=True)
             datas = re.findall(r'<div class="cell">(已连续登录 \d+ 天)</div>', r.text)
 
@@ -54,8 +52,8 @@ class V2ex:
             total = p.html.find('a.balance_area', first=True).text.replace(" ", "")
             credit_info = f"{datas[0]}\n{today[0]}\n当前账户余额：{total} 铜币"
 
-            res = (f"---- {username.text} V2EX 签到状态 ----"
-                   f'\n{sign_msg}\n{credit_info}')
+            res = (f"---- {username.text} V2EX 签到状态 ----\n"
+                   f'{sign_msg}\n{credit_info}')
 
         except Exception as e:
             res = f"<b><span style='color: red'>未知异常：</span></b>\n{e}"

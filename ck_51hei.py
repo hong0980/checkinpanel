@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 3 0 * * *
+cron: 20 1 0 * * *
 new Env('51黑电子论坛 签到');
 """
 import re, requests

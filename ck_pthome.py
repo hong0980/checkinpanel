@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 1 0 * * *
+cron: 10 1 0 * * *
 new Env('PTHOME 签到');
 """
 import re, requests

@@ -14,11 +14,10 @@ alpine_pkgs="build-base tesseract-ocr-data-eng chromium chromium-chromedriver li
 install() {
     local count=0 flag=$1
     while true; do
-        echo ".......... 开始安装 ${2##* } ........."
         local result=$3
         flag=$((result > 0 ? 0 : 1))
         if [ "$flag" -eq "$1" ]; then
-            echo "---------- $2 成功安装 ----------"
+            echo -e "---------- ${2##* } 安装成功 ----------\n"
             break
         else
             count=$((count + 1))
@@ -38,19 +37,21 @@ install_alpine_pkgs() {
         if apk info -e "$pkg" >/dev/null 2>&1; then
             echo "$pkg 已安装"
         else
-            install 0 "apk add $pkg" "$(apk add --no-cache "$pkg" | grep -c 'OK')"
+            echo ".......... 开始安装 $pkg ........."
+            install 0 "apk add --no-cache $pkg" "$(apk add --no-cache "$pkg" | grep -c 'OK')"
         fi
     done
 }
 
 install_py_reqs() {
-    pip3 install --root-user-action=ignore --upgrade pip
-    for req in $py_reqs; do
-        if pip show "$req" >/dev/null 2>&1; then
-            echo "$req 已安装"
+    pip3 install --root-user-action=ignore --upgrade pip -q
+    for pkg in $py_reqs; do
+        if pip show "$pkg" >/dev/null 2>&1; then
+            echo "$pkg 已安装"
         else
-            install 0 "pip3 install $req" \
-            "$(pip3 install --disable-pip-version-check --root-user-action=ignore "$req" | grep -c 'Successfully')"
+            echo ".......... 开始安装 $pkg ........."
+            install 0 "pip3 install $pkg" \
+            "$(pip3 install --disable-pip-version-check --root-user-action=ignore "$pkg" | grep -c 'Successfully')"
         fi
     done
 }

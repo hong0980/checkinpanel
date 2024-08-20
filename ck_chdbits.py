@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 55 59 23 * * *
+cron: 55 59 11,23 * * *
 new Env('CHDBits 签到');
 """
 
@@ -8,7 +8,6 @@ import re, sys, time
 try:
     import answers
 except ImportError:
-    print("无法导入 'answers' 模块，退出。")
     sys.exit(1)
 from utils import get_data
 from notify_mtr import send
@@ -44,12 +43,12 @@ class Get:
                 return sample(valid_values, 3)
             return choice(valid_values)
 
-        valid_values = ('1', '2', '4', '8')
-        p, x, msg, res, cg_msg = None, '', '', '', ''
         url = 'https://ptchdbits.co/bakatest.php'
-        headers = {'referer': url, 'Cookie': cookie,
+        headers = {'referer': url,
+                   'Cookie': cookie,
                    'authority': 'ptchdbits.co',
                    'origin': 'https://ptchdbits.co'}
+        p, x, msg, cg_msg, valid_values = None, '', '', '', ('1', '2', '4', '8')
 
         try:
             with HTMLSession(executablePath='/usr/bin/chromium') as s:
@@ -60,9 +59,8 @@ class Get:
                 if question_id is None:
                     return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
-                if '签过到了' in r.text:
-                    qd_msg = re.findall(r'<font color="white">(.*?签到.*?)</font>', r.text)[0]
-                else:
+                qd_msg = re.findall(r'<font color="white">(.*?签到.*?)</font>', r.text)
+                if not '签过到了' in r.text:
                     answer = answers.get(question_id)
                     if not answer or check_answer_values(answer):
                         x = 1 if answer else 2
@@ -95,18 +93,13 @@ class Get:
                         question_text = re.sub(r"&nbsp;|&quot;", '', question_text)
                         msg += f'{question_text}\n'
                     msg += '\n'
-                    matche = re.findall(r"title='(.*?)'\s*>(\d+)</td>", p.text)
-                    matche = sorted(matche, key=lambda x: int(x[1]))
-                    for matchs in matche:
-                        if not answers.check_key(matchs[1]):
-                            print(f"'{matchs[1]}': '',  # {matchs[0]}")
 
-                    qd_msg = re.findall(r'<font color="white">(.*?签到.*?)</font>', p.text)[0]
-                    if '获得' in qd_msg:
+                    qd_msg = re.findall(r'<font color="white">(.*?签到.*?)</font>', p.text)
+                    if '获得' in qd_msg[0]:
                         cg_msg = f"<b><span style='color: green'>签到成功</span></b> {now_time}\n"
                         with open('/tmp/chdbits_成功.html.txt', 'w', encoding='utf-8') as file:
                             file.write(p.html.html)
-                    elif not '签过到了' in qd_msg:
+                    elif not '签过到了' in qd_msg[0]:
                         cg_msg = "<b><span style='color: red'>签到失败</span></b>\n"
 
                 pattern = (r'UltimateUser_Name\'><b>(.*?)</b>.*?'
@@ -118,15 +111,19 @@ class Get:
                            r'做种积分: </font>\s*(.*?)</')
                 text_search = p.text if p else r.text
                 result = re.findall(pattern, text_search, re.DOTALL)[0]
-                res = f"--- {result[0]} CHDBits 签到结果 ---\n{cg_msg}"
-                res += f"<b><span style='color: {'purple' if '签过到了' in qd_msg else 'orange'}'>{qd_msg}</span></b>\n\n"
-                res += (f'{msg}<b><span style="color: orange">账户信息</span></b>\n'
-                        f'魔力值：{result[1]}\n'
-                        f'分享率：{result[2]}\n'
-                        f'上传量：{result[3]}\n'
-                        f'下载量：{result[4]}\n'
-                        f'当前做种：{result[5]}\n'
-                        f'做种积分：{result[6]}')
+                res = (f"--- {result[0]} CHDBits 签到结果 ---\n{cg_msg}<b><span style='color: "
+                       f"{'purple' if '签过到了' in qd_msg[0] else 'orange'}'>{qd_msg[0]}</span></b>\n\n"
+                       f'{msg}<b><span style="color: orange">账户信息</span></b>\n'
+                       f'魔力值：{result[1]}\n分享率：{result[2]}\n'
+                       f'上传量：{result[3]}\n下载量：{result[4]}\n'
+                       f'当前做种：{result[5]}\n做种积分：{result[6]}')
+
+                for matchs in re.findall(r"title='(.*?)'\s*>(\d+)</td>", text_search):
+                    if not answers.check_key(matchs[1]):
+                        f = f"'{matchs[1]}': '',  # {matchs[0]}"
+                        print(f)
+                        with open('/tmp/chdbits_题目.txt', 'a', encoding='utf-8') as file:
+                            file.write(f + '\n')
 
         except Exception as e:
             res = f"发生异常: {e}"
@@ -143,5 +140,7 @@ if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("CHDBITS", [])
     result = Get(check_items=_check_items).main()
-    send("CHDBits 签到", result)
-    # print(result)
+    if '获得' in result:
+        send("CHDBits 签到", result)
+    else:
+        print(result)

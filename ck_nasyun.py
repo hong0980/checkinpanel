@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-cron: 3 0 * * *
+cron: 55 0 0 * * *
 new Env('那是云 签到');
 """
-import re
-import requests
+import re, requests
 from utils import get_data
 from notify_mtr import send
 
@@ -24,7 +23,6 @@ class nasyun:
         }
         try:
             r = session.get('http://www.nasyun.com/home.php', headers=headers)
-            print(r.text)
             name = re.findall(r'title="访问我的空间" >(\w+)</a></div>', r.text)
             name = name[0] if name else None
             if name is None:
@@ -35,8 +33,10 @@ class nasyun:
             matches = re.findall(pattern, r.text)
             res = f"---- {name} 那是云 签到结果 ----\n\n<b>账户信息</b>\n"
             res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
-        except Exception as e:
-            return f"发生异常: {e}"
+
+        except Exception:
+            import traceback
+            return f"<b><span style='color: red'>发生异常：</span></b>\n{traceback.format_exc()}"
         return res
 
     def main(self):

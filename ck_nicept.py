@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 55 59 11,23 * * *
+cron: 55 59 15,23 * * *
 new Env('NicePT 签到');
 """
 

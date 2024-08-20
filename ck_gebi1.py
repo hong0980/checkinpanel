@@ -35,25 +35,21 @@ class gebi1:
                 if name is None:
                     return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
-                sign_msg = f"<b><span style='color: green'>今日已签到</span></b>\n"
-                JD_sign = r.html.find('a#JD_sign', first=True)
-                # formhash = re.findall(r'<a.*?action=logout&amp;formhash=(\w+)".*?>退出登录</a>', r.text)[0]
-                # sign_url = f'{url}&operation=qiandao&formhash={formhash}&format=empty'
-
-                if JD_sign:
-                    s.get(f"https://www.gebi1.com/{JD_sign.attrs['href']}")
-                    now_time = datetime.now().time()
+                formhash = re.findall(r'action=logout&amp;formhash=(\w+)"', r.text)
+                p = s.get(url, params = {
+                    "operation": "qiandao", "format": "empty", "formhash": formhash[0]
+                })
+                msg = p.html.search('CDATA[{}]]')
+                sign_msg = (f"<b><span style='color: green'>"
+                            f"{msg[0] if msg else '签到成功'}</span></b> {datetime.now().time()}\n")
+                if '成功' in sign_msg:
                     r = s.get(url)
-                    if not r.html.find('a#JD_sign', first=True):
-                        sign_msg = f"<b><span style='color: green'>签到成功</span></b> {now_time}\n"
 
-                credit_info = (
-                    f'签到排名：{r.html.find("#qiandaobtnnum")[0].attrs["value"]}\n'
-                    f'连续签到：{r.html.find("#lxdays")[0].attrs["value"]} 天\n'
-                    f'签到等级：LV.{r.html.find("#lxlevel")[0].attrs["value"]}\n'
-                    f'积分奖励：{r.html.find("#lxreward")[0].attrs["value"]} 条丝瓜\n'
-                    f'累计签到：{r.html.find("#lxtdays")[0].attrs["value"]} 天\n\n'
-                )
+                credit_info = (f'签到排名：{r.html.find("#qiandaobtnnum")[0].attrs["value"]}\n'
+                               f'连续签到：{r.html.find("#lxdays")[0].attrs["value"]} 天\n'
+                               f'签到等级：LV.{r.html.find("#lxlevel")[0].attrs["value"]}\n'
+                               f'积分奖励：{r.html.find("#lxreward")[0].attrs["value"]} 条丝瓜\n'
+                               f'累计签到：{r.html.find("#lxtdays")[0].attrs["value"]} 天\n\n')
 
                 response = s.get('https://www.gebi1.com/home.php?mod=spacecp&ac=credit')
                 pattern = r'<em>\s*(丝瓜|经验值|积分|贡献):\s*</em>(\d+)'

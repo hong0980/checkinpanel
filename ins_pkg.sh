@@ -9,7 +9,7 @@ COMMENT
 . utils_env.sh
 get_some_path
 checkinpanel_master=$(find "${SCR_PATH}" -type d -name "*checkinpanel_master" -print -quit 2>/dev/null \
-    || echo "OreosLab_checkinpanel_master")
+                    || echo "OreosLab_checkinpanel_master")
 checkinpanel_master=${checkinpanel_master##*/}
 
 pl_mods="File::Slurp JSON5 TOML::Dumper"
@@ -20,11 +20,10 @@ py_reqs="cryptography dateparser feedparser peewee pytest requests_html schedule
 install() {
     local count=0 flag=$1
     while true; do
-        echo ".......... 开始安装 ${2##* } ........."
         local result=$3
         flag=$((result > 0 ? 0 : 1))
         if [ "$flag" -eq "$1" ]; then
-            echo "---------- $2 成功安装 ----------"
+            echo -e "---------- ${2##* } 安装成功 ----------\n"
             break
         else
             count=$((count + 1))
@@ -44,19 +43,21 @@ install_alpine_pkgs() {
         if apk info -e "$pkg" >/dev/null 2>&1; then
             echo "$pkg 已安装"
         else
+            echo ".......... 开始安装 $pkg ........."
             install 0 "apk add $pkg" "$(apk add --no-cache "$pkg" | grep -c 'OK')"
         fi
     done
 }
 
 install_py_reqs() {
-    pip3 install --root-user-action=ignore --upgrade pip
-    for req in $py_reqs; do
-        if pip show "$req" >/dev/null 2>&1; then
-            echo "$req 已安装"
+    pip3 install --root-user-action=ignore --upgrade pip -q
+    for pkg in $py_reqs; do
+        if pip show "$pkg" >/dev/null 2>&1; then
+            echo "$pkg 已安装"
         else
-            install 0 "pip3 install $req" \
-            "$(pip3 install --disable-pip-version-check --root-user-action=ignore "$req" | grep -c 'Successfully')"
+            echo ".......... 开始安装 $pkg ........."
+            install 0 "pip3 install $pkg" \
+            "$(pip3 install --disable-pip-version-check --root-user-action=ignore "$pkg" | grep -c 'Successfully')"
         fi
     done
 
@@ -104,18 +105,21 @@ install_js_pkgs_initial() {
 
 install_js_pkgs_all() {
     install_js_pkgs_initial
-    for i in $js_pkgs; do
-        if ! npm ls "$i" | grep -qE '(empty|ERR)'; then
-            echo "$i 已正确安装"
+    for pkg in $js_pkgs; do
+        ls_result=$(npm ls "$pkg" --silent)
+        if grep -q 'empty' <<< "$ls_result"; then
+            echo ".......... 开始安装 $pkg ........."
+            install 1 "npm install $pkg" \
+                "$(npm install --force --silent "$pkg" && npm ls "$pkg" --silent | grep -qE 'empty|ERR')"
+        elif grep -q 'ERR' <<< "$ls_result"; then
+            echo "...... $pkg 安装错误，开始删除 ....."
+            npm uninstall "$pkg" --silent
+            rm -rf "$(pwd)"/node_modules/"$pkg"
+            rm -rf /usr/local/lib/node_modules/"$pkg"
+            npm install > /dev/null 2>&1
+            npm cache clean --force --silent
         else
-            [ "$(npm ls "$i" | grep ERR)" ] && {
-                npm uninstall "$i"
-                rm -rf "$(pwd)/node_modules/$i"
-                rm -rf /usr/local/lib/node_modules/lodash/*
-                npm cache clean --force
-            }
-            install 1 "npm install $i" \
-            "$(npm install --force "$i" && npm ls "$i" | grep -qE '(empty|ERR)')"
+            echo "$pkg 已正确安装"
         fi
     done
     npm ls --depth 0
@@ -125,23 +129,24 @@ install_pl_mods() {
     if command -v cpm >/dev/null 2>&1; then
         echo "App::cpm 已安装"
     else
-        install 1 "cpanm -fn App::cpm" "$(cpanm -fn App::cpm | grep -c 'FAIL')"
-        
+        install 1 "cpanm -fn App::cpm" "$(cpanm -fn App::cpm | grep -c "FAIL")"
         if ! command -v cpm >/dev/null 2>&1; then
             if [ -f ./cpm ]; then
                 chmod +x cpm && ./cpm --version
             else
-                cp -vf /ql/repo/${checkinpanel_master}/cpm ./ && chmod +x cpm && ./cpm --version ||
-                curl -fsSL https://cdn.jsdelivr.net/gh/Oreomeow/checkinpanel/cpm >cpm && chmod +x cpm && ./cpm --version
+                cp -vf /ql/repo/${checkinpanel_master}/cpm ./ && chmod +x cpm && ./cpm --version
+                if [ ! -f ./cpm ]; then
+                    curl -fsSL https://cdn.jsdelivr.net/gh/Oreomeow/checkinpanel/cpm >cpm && chmod +x cpm && ./cpm --version
+                fi
             fi
         fi
     fi
-    
     for i in $pl_mods; do
         if perldoc -l "$i" > /dev/null 2>&1; then
             echo "$i 已安装"
         else
-            install 1 "cpm install -g $i" "$(cpm install -g "$i" | grep -c 'FAIL')"
+            echo ".......... 开始安装 $i ........."
+            install 1 "cpm install -g $i" "$(cpm install -g --static-install "$i" | grep -q "FAIL")"
         fi
     done
 }
