@@ -57,7 +57,8 @@ class Get:
                 question_id = r.html.search('name="questionid" value="{}"')
                 question_id = question_id[0] if question_id else None
                 if question_id is None:
-                    return f'账号({i})无法登录！可能Cookie失效，请重新修改'
+                    return (f"<b><span style='color: red'>签到失败</span></b>\n"
+                            f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
                 qd_msg = re.findall(r'<font color="white">(.*?签到.*?)</font>', r.text)
                 if not '签过到了' in r.text:
@@ -125,8 +126,9 @@ class Get:
                         with open('/tmp/chdbits_题目.txt', 'a', encoding='utf-8') as file:
                             file.write(f + '\n')
 
-        except Exception as e:
-            res = f"发生异常: {e}"
+        except Exception:
+            import traceback
+            return f"<b><span style='color: red'>未知异常：</span></b>\n{traceback.format_exc()}"
         return res
 
     def main(self):

@@ -33,33 +33,31 @@ class V2ex:
                 s.proxies.update({"http": proxy, "https": proxy})
 
             r = s.get(self.url)
-            urls = r.html.search('onclick="location.href = \'{}\';" />')
+            urls = r.html.search('onclick="location.href = \'{}\';"')
             url = urls[0] if urls else None
             if url is None:
-                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
+                return (f"<b><span style='color: red'>签到失败</span></b>\n"
+                        f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-            sign_msg = f"<b><span style='color: green'>今天已经签到过了</span></b>"
+            sign_msg = f"<b><span style='color: orange'>今天已经签到过了</span></b>"
             if 'once' in url:
-                s.get(f'https://www.v2ex.com{url}')
+                r = s.get(f'https://www.v2ex.com{url}')
                 sign_msg = f"<b><span style='color: green'>签到成功</span></b>"
-                r = s.get(self.url)
-            username = r.html.find('span[class="bigger"]', first=True)
-            datas = re.findall(r'<div class="cell">(已连续登录 \d+ 天)</div>', r.text)
+            username = r.html.find('span.bigger', first=True)
+            datas = re.findall(r'>(已连续登录 \d+ 天)<', r.text)
 
             p = s.get('https://www.v2ex.com/balance')
             today = re.findall(rf'{datetime.now().strftime("%Y%m%d")}.*?(每日登录奖励 \d+ 铜币)</span>', p.text)
-            sign_msg = f"<b><span style='color: red'>签到失败</span></b>" if not today[0] else sign_msg
-            total = p.html.find('a.balance_area', first=True).text.replace(" ", "")
-            credit_info = f"{datas[0]}\n{today[0]}\n当前账户余额：{total} 铜币"
+            total = p.html.find('table.data tr:nth-of-type(2) td:nth-of-type(4)', first=True)
+            sign_msg, today = (sign_msg, today[0] + '\n') if today else \
+                              (f"<b><span style='color: red'>签到失败</span></b>", '')
 
-            res = (f"---- {username.text} V2EX 签到状态 ----\n"
-                   f'{sign_msg}\n{credit_info}')
+            return (f'---- {username.text} V2EX 签到状态 ----\n{sign_msg}\n'
+                    f"{datas[0]}\n{today}当前账户余额：{total.text} 铜币")
 
-        except Exception as e:
-            res = f"<b><span style='color: red'>未知异常：</span></b>\n{e}"
-        finally:
-            pass
-        return res
+        except Exception:
+            import traceback
+            return f"<b><span style='color: red'>未知异常：</span></b>\n{traceback.format_exc()}"
 
     def main(self):
         msg_all = ""

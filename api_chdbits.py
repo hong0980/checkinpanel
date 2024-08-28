@@ -17,7 +17,9 @@ class Get:
     def sign(cookie, Movies_quantity, i):
         res = ''
         headers = {"Cookie": cookie}
-        movie_info = f'<b>（2）当前最新的 {Movies_quantity} 部信息：</b>\n'
+        circled_numbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩',
+                           '⑪', '⑫', '⑬', '⑭', '⑮', '⑯', '⑰', '⑱', '⑲', '⑳']
+        movie_info = f'<b> ⑵ 当前最新的 {Movies_quantity} 部信息：</b>\n'
         r = requests.get('https://ptchdbits.co/torrents.php', headers=headers)
         soup = BS(r.text, "html.parser")
 
@@ -40,7 +42,7 @@ class Get:
                 imdb_rating = imdb_img.find_next_sibling(string=True).strip() if imdb_img else ''
                 chinese_name = ' '.join(Moviesinfo.find('font', class_='subtitle').stripped_strings)
 
-                movie_info += (f"<b>{sequence}):</b>\n【{category}】："
+                movie_info += (f"<b>{circled_numbers[sequence - 1]}：</b>【{category}】"
                                f"<b><span style='color:red'>{chinese_name}</span>"
                                f"<span style='color:blue'> {movie_name}</span></b>\n"
                                f"【文件大小】: {size}\n"
@@ -60,7 +62,7 @@ class Get:
                        r'<font.*?当前做种.*?(\d+).*?<font.*?'
                        r'做种积分: </font>\s*(.*?)</')
             result = re.findall(pattern, r.text, re.DOTALL)[0]
-            res = (f'<b>（1）{result[0]} 账户信息：</b>\n'
+            res = (f'<b> ⑴ {result[0]} 账户信息：</b>\n'
                    f'魔力值：{result[1]}\n'
                    f'分享率：{result[2]}\n'
                    f'上传量：{result[3]}\n'

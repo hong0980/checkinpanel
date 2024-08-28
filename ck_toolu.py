@@ -31,7 +31,7 @@ class ToolLu:
             c = s.get('https://id.tool.lu/credits')
             match = re.search(rf'{current_date}.*?积分</td>', c.text, re.DOTALL)
             consecutive = re.findall(rf'{current_date}.*?(连续.*?积分)</td>', match.group(0), re.DOTALL)
-            consecutive = consecutive + '\n' if consecutive else ''
+            consecutives = consecutive[0] + '\n' if consecutive else ''
             daily_points = re.findall(rf'{current_date}.*?(每日.*?积分)</td>', c.text, re.DOTALL)[0]
             points = re.findall(r'>(.*?)<span class="badge bg-warning">(.*?)</span>', c.text)[0]
             last_time = re.findall(rf'<div class="mb-6">(最近签到时间：{current_date}.*?)</div>', r.text)
@@ -40,7 +40,7 @@ class ToolLu:
             return (f"---- {name} 在线工具 签到结果 ----\n"
                     f"<b><span style='color: {color}'>签到{status}</span></b>\n\n"
                     f"<b>账户信息</b>\n{consecutive_sign_in}\n{daily_points}\n"
-                    f"{consecutive}{points[0]}{points[1]}\n{last_time}")
+                    f"{consecutives}{points[0]}{points[1]}\n{last_time}")
 
         except Exception:
             import traceback

@@ -18,7 +18,7 @@ class HDSky:
     @staticmethod
     def sign(cookie, i):
         def fetch_image_hash():
-            imagehash = s.post('https://hdsky.me/image_code_ajax.php', data={'action': 'new'}).json().get('code', None)
+            imagehash = s.post('https://hdsky.me/image_code_ajax.php', data={'action': 'new'}).json().get('code')
             img_response = s.get('https://hdsky.me/image.php', params={'action': 'regimage', 'imagehash': imagehash})
             return imagehash, img_response
 
@@ -44,24 +44,22 @@ class HDSky:
             img = binarize_image(img_response, 100)
             custom_config = r'--oem 3 --psm 6' # oem 0-4 psm 0-13
             imagestring = pytesseract.image_to_string(img, lang='eng', config=custom_config)
-            imagestring = re.sub(r'\W+', '', imagestring)
-            if imagestring and len(imagestring) == 6:
-                img.save(f'/tmp/captcha.jpg')
-                return imagestring
-            return None
+            imagestring = re.sub(r'[\W_]', '', imagestring)
+            return imagestring if len(imagestring) == 6 else None
 
         url = 'https://hdsky.me/torrents.php'
         headers = {
             "Cookie": cookie, 'authority': 'hdsky.me',
-            'referer': url, 'origin': 'https://hdsky.me',
+            'referer': url, 'origin': 'https://hdsky.me'
         }
         msg, count, max_count, cg_msg = '', 0, 5, '你今天已经签到了，请勿重复签到'
 
         try:
             with HTMLSession() as s:
                 r = s.get(url, headers=headers, timeout=5)
-                if not "欢迎回来" in r.text:
-                    return f'账号({i})无法登录！可能Cookie失效，请重新修改'
+                if "未登录!" in r.text:
+                    return (f"<b><span style='color: red'>签到失败</span></b>\n"
+                            f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
                 if not '[已签到]' in r.text:
                     while count < max_count:
@@ -71,15 +69,15 @@ class HDSky:
                         short_imagehash = f"{imagehash[:3]}...{imagehash[-3:]}"
                         if imagestring:
                             print(f"识别到 {short_imagehash} 验证码: {imagestring}，执行第 {count + 1} 次签到。")
-                            data = {'action': 'showup', 'imagehash': imagehash, 'imagestring': imagestring,}
-                            p = s.post('https://hdsky.me/showup.php', headers=headers, data=data)
-                            message = p.json().get('message', None)
+                            data = {'action': 'showup', 'imagehash': imagehash, 'imagestring': imagestring}
+                            p = s.post('https://hdsky.me/showup.php', headers=headers, data=data).json()
+                            success, message = p.get('success'), p.get('message')
 
-                            if p.json().get('success'):
-                                days = int((message - 10) / 2 + 1)
+                            # if success:
+                            if isinstance(message, int):
                                 msg = "<b><span style='color: green'>签到成功</span></b>\n"
-                                cg_msg = (f"已连续签到 {days} 天，奖励 {message} 魔力值，"
-                                          f"明日继续签到可获取 {message + 2} 魔力值")
+                                cg_msg = (f"已连续签到 {int((message - 10) / 2 + 1)} 天，"
+                                          f"奖励 {message} 魔力值，明日继续签到可获取 {message + 2} 魔力值")
                                 r = s.get(url, headers=headers)
                                 break
                             elif message == 'date_unmatch':

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 25 0 0 * * *
+cron: 25 3 0 * * *
 new Env('恩山论坛 签到');
 """
 
@@ -40,8 +40,9 @@ class Enshan:
             res = f"---- {name} 恩山论坛 签到结果 ----\n{sign_msg}\n\n<b>账户信息</b>\n"
             res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
 
-        except Exception as e:
-            res = f"发生异常: {e}"
+        except Exception:
+            import traceback
+            return f"<b><span style='color: red'>未知异常：</span></b>\n{traceback.format_exc()}"
         except requests.RequestException as e:
             res = f"请求发生错误: {e}"
         return res

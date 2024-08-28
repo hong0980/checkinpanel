@@ -19,14 +19,15 @@ class znds:
             s = HTMLSession()
             url = 'https://www.znds.com/'
             s.cookies.set('Cookie', cookie)
+            sign_msg = "<b><span style='color: red'>签到失败</span></b>"
             s.headers.update({'referer': url, 'authority': 'www.znds.com'})
             r = s.get(url)
             name = r.html.search('title="访问我的空间">{}</a>')
             name = name[0] if name else None
             if name is None:
-                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
+                return (f"{sign_msg}\n"
+                        f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-            sign_msg = "<b><span style='color: red'>签到失败</span></b>"
             formhash = re.findall(r'action=logout&amp;formhash=(\w+)">退出', r.text)
             r = s.get(f'{url}plugin.php', params={
                 'id': 'ljdaka:daka', 'handlekey': 'ljdaka',

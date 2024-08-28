@@ -33,7 +33,8 @@ class gebi1:
                 name = r.html.search('title="访问我的空间" class="kmname">{}</a>')
                 name = name[0] if name else None
                 if name is None:
-                    return f'账号({i})无法登录！可能Cookie失效，请重新修改'
+                    return (f"<b><span style='color: red'>签到失败</span></b>\n"
+                            f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
                 formhash = re.findall(r'action=logout&amp;formhash=(\w+)"', r.text)
                 p = s.get(url, params = {

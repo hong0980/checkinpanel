@@ -26,7 +26,8 @@ class nasyun:
             name = re.findall(r'title="访问我的空间" >(\w+)</a></div>', r.text)
             name = name[0] if name else None
             if name is None:
-                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
+                return (f"<b><span style='color: red'>签到失败</span></b>\n"
+                        f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
             r = session.get(url, headers=headers)
             pattern = r'<em>\s*(云币|贡献|活跃|积分):\s*</em>(\d+)'

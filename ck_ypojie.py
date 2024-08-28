@@ -30,7 +30,8 @@ class Get:
             name = f.html.search('> Hi, {} <')
             name = name[0] if name else None
             if name is None:
-                return f'账号{i}登录不成功，用户名或密码可能错误。'
+                return (f"<b><span style='color: red'>签到失败</span></b>\n"
+                        f"账号{i}登录不成功，用户名或密码可能错误。")
 
             r = s.get(f'{url}/vip')
             sign_button = r.html.find('a.usercheck.erphpdown-sc-btn', first=True)

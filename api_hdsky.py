@@ -19,9 +19,11 @@ class Get:
         session = HTMLSession()
         try:
             url = 'https://hdsky.me/'
+            circled_numbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩',
+                               '⑪', '⑫', '⑬', '⑭', '⑮', '⑯', '⑰', '⑱', '⑲', '⑳']
             r = session.get(url + 'torrents.php', headers={"Cookie": cookie}, timeout=10)
             if "欢迎回来" in r.text:
-                movie_info = f'<b>（2）当前最新的{Movies_quantity}部信息：</b>\n'
+                movie_info = f'<b> ⑵ 当前最新的{Movies_quantity}部信息：</b>\n'
                 soup = BeautifulSoup(r.text, "html.parser")
                 user_name = soup.find('a', class_='InsaneUser_Name').find('b').text
                 Movieslist = soup.find_all('tr', class_='stickbg progresstr')
@@ -53,7 +55,7 @@ class Get:
                                     dd = dt.find_next_sibling('dd')
                                     value = dd.get_text(strip=True) if dd else ''
                                     douban_msg = ('<b>豆瓣信息：</b>\n'
-                                                 f"【<span style='color: #FE830F'>  {key}  </span>】：{value}\n")
+                                                 f"【<span style='color: #FE830F'>{key}</span>】：{value}\n")
 
                     category = info.img.get('title')
                     name = info.find('a', title=True)['title']
@@ -63,8 +65,8 @@ class Get:
                     data = [td.get_text(strip=True) for td in td_tags]
                     if len(data) >= 8:
                         time, size, seeders, leechers, snatched = data[3:8]
-                        movie_info += (f"<b>{i}):</b>\n"
-                                       f"【<span style='color: magenta'>{category}</span>】："
+                        movie_info += (f"<b>{circled_numbers[i - 1]}</b>："
+                                       f"【<span style='color: magenta'>{category}</span>】"
                                        f"<b>(<span style='color: green'>{remaining}</span>) "
                                        f"<span style='color: red'>{chinese_name}</span> "
                                        f"<span style='color: blue'>{name}</span></b>\n"
@@ -83,7 +85,7 @@ class Get:
                 uploaded = re.findall(r"上传量.*?> (.*).*?<f", r.text)[0].strip()
                 downloaded = re.findall(r"下载量.*?> (.*).*?<f", r.text)[0].strip()
                 active = re.findall(r"trans.gif\"/>(\d+).*?arrowdown", r.text)[0].strip()
-                res += (f"<b>（1）账户信息：</b>\n"
+                res += (f"<b> ⑴ 账户信息：</b>\n"
                         f"用户名：{user_name}\n"
                         f"魔力值：{bonus}\n"
                         f"分享率：{ratio}\n"
