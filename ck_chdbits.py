@@ -20,14 +20,6 @@ class Get:
 
     @staticmethod
     def sign(cookie, i):
-        def countdown():
-            now = datetime.now()
-            if now.hour == 23 and 57 <= now.minute <= 59:
-                midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-                sleep_seconds = (midnight - now).total_seconds()
-                print(f'等待{int(sleep_seconds)}秒后执行签到！')
-                time.sleep(sleep_seconds)
-
         def check_answer_values(value):
             return not ((isinstance(value, str) and value in valid_values) \
                    or (isinstance(value, list) and all(v in valid_values for v in value)))
@@ -43,16 +35,19 @@ class Get:
                 return sample(valid_values, 3)
             return choice(valid_values)
 
-        url = 'https://ptchdbits.co/bakatest.php'
-        headers = {'referer': url,
-                   'Cookie': cookie,
-                   'authority': 'ptchdbits.co',
-                   'origin': 'https://ptchdbits.co'}
-        p, x, msg, cg_msg, valid_values = None, '', '', '', ('1', '2', '4', '8')
+        p, x, msg, cg_msg, now, g, url, valid_values = '', '', '', '', datetime.now(), \
+        '使用数值答题', 'https://ptchdbits.co/bakatest.php', ('1', '2', '4', '8')
+        headers = {'referer': url, 'authority': 'ptchdbits.co',
+                   'Cookie': cookie, 'origin': 'https://ptchdbits.co'}
 
         try:
             with HTMLSession(executablePath='/usr/bin/chromium') as s:
-                countdown()
+                if now.hour == 23 and 57 <= now.minute <= 59:
+                    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+                    sleep_seconds = (midnight - now).total_seconds()
+                    print(f'等待{int(sleep_seconds)}秒后执行签到！')
+                    time.sleep(sleep_seconds)
+
                 r = s.get(url, headers=headers)
                 question_id = r.html.search('name="questionid" value="{}"')
                 question_id = question_id[0] if question_id else None
@@ -60,26 +55,22 @@ class Get:
                     return (f"<b><span style='color: red'>签到失败</span></b>\n"
                             f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-                qd_msg = re.findall(r'<font color="white">(.*?签到.*?)</font>', r.text)
+                qd_msg = re.findall(r'white">(.*?签到.*?)<', r.text)
                 if not '签过到了' in r.text:
                     answer = answers.get(question_id)
                     if not answer or check_answer_values(answer):
                         x = 1 if answer else 2
                         answer = generate_answer(r, answer)
 
-                    data = {'choice[]': answer,
-                            'wantskip': '不会',
-                            'questionid': question_id,
-                            'usercomment': '此刻心情:无'}
+                    data = {'choice[]': answer, 'questionid': question_id,
+                            'wantskip': '不会', 'usercomment': '此刻心情:无'}
                     p = s.post(url, headers=headers, data=data)
-
                     now_time = datetime.now().time()
-                    question = re.findall(r'\](\[.选\])\s*请问：(.*?)</td>', r.text)[0]
+                    question = re.findall(r'](\[.选\])\s*?请问：(.*?)</td>', r.text)[0]
                     table_tag = r.html.find('table[border="1"]', first=True)
                     question_text = table_tag.find('td')[1].text.strip()
                     msg = (f'<b><span style="color: orange">题目 {question_id}</span></b>\n'
                            f'{question[0]}：{question[1]}\n{question_text}\n\n')
-                    g = '使用数值答题'
                     if x:
                         g = f'{"使用题目答题" if x == 1 else "使用随机答题"}：{answer}'
                         tr_tags = table_tag.find('tr')[:2]
@@ -95,7 +86,7 @@ class Get:
                         msg += f'{question_text}\n'
                     msg += '\n'
 
-                    qd_msg = re.findall(r'<font color="white">(.*?签到.*?)</font>', p.text)
+                    qd_msg = re.findall(r'white">(.*?签到.*?)<', p.text)
                     if '获得' in qd_msg[0]:
                         cg_msg = f"<b><span style='color: green'>签到成功</span></b> {now_time}\n"
                         with open('/tmp/chdbits_成功.html.txt', 'w', encoding='utf-8') as file:
@@ -103,13 +94,13 @@ class Get:
                     elif not '签过到了' in qd_msg[0]:
                         cg_msg = "<b><span style='color: red'>签到失败</span></b>\n"
 
-                pattern = (r'UltimateUser_Name\'><b>(.*?)</b>.*?'
-                           r'使用</a>]: (.*?)\s*'
-                           r'<font.*?分享率：</font>\s*(.*?)\s*'
-                           r'<font.*?上传量：</font>\s*(.*?)\s*'
-                           r'<font.*?下载量：</font>\s*(.*?)\s*'
-                           r'<font.*?当前做种.*?(\d+).*?<font.*?'
-                           r'做种积分: </font>\s*(.*?)</')
+                pattern = (r"UltimateUser_Name'><b>(.*?)</b>.*?"
+                           r'使用</a>]:\s*?(.*?)\s*?<.*?'
+                           r'分享率：</font>\s*?(.*?)\s*?<.*?'
+                           r'上传量：</font>\s*?(.*?)\s*?<.*?'
+                           r'下载量：</font>\s*?(.*?)\s*?<.*?'
+                           r'当前做种.*?(\d+).*?<.*?'
+                           r'做种积分: </font>\s*?(.*?)<')
                 text_search = p.text if p else r.text
                 result = re.findall(pattern, text_search, re.DOTALL)[0]
                 res = (f"--- {result[0]} CHDBits 签到结果 ---\n{cg_msg}<b><span style='color: "
