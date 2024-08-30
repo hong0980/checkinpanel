@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 0 0 0 * * *
+cron: 0 0 0,9 * * *
 new Env('HiFiNi 签到');
 """
 
@@ -15,8 +15,8 @@ class HiFiNi:
 
     @staticmethod
     def sign(cookies, i):
-        day, s, headers, url = '', HTMLSession(), \
-        {'cookie': cookies}, "https://www.hifini.com/sg_sign.htm"
+        day, s, headers, url, message = '', HTMLSession(), {'cookie': cookies}, \
+        "https://www.hifini.com/sg_sign.htm", "<b><span style='color: red'>签到失败/span></b>"
         r = s.get(url, headers=headers)
         name = r.html.find('li.username', first=True)
         if name is None:
@@ -25,19 +25,21 @@ class HiFiNi:
 
         sign = re.findall(r'sign = "(\w+)"', r.text)
         headers.update({'X-Requested-With': 'XMLHttpRequest'})
-        p = s.post(url, data={'sign': sign[0]}, headers=headers).json()
+        p = s.post(url, data={'sign': sign[0]}, headers=headers)
         headers.pop('X-Requested-With', None)
-        code, message = p.get('code'), p.get('message')
-        r = s.get(url, headers=headers)
-        day = '\n已经' + re.findall(r'(连续签到 \d+ 天)', r.text)[0]
+
+        if p.status_code == 200:
+            message = f'{p.json().get("message")}'
+            r = s.get(url, headers=headers)
+            day = f'当前{re.findall(r"连续签到 .*? 天", r.text)[0]}\n'
 
         f = s.get('https://www.hifini.com/my-credits.htm', headers=headers)
         matches = re.findall(r'(经验|金币|人民币).*?value="(\d+)"', f.text)
         res = ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
         group = re.findall(r'<p>(用户组: .*?)</p>', f.text)[0]
         schedule = f.html.find('div.progress', first=True).text
-        return (f"--- {name.text} HiFiNi 签到结果 ---\n{message}"
-                f"{day}\n\n<b>账户信息</b>\n{group}  {schedule}\n{res}")
+        return (f"--- {name.text} HiFiNi 签到结果 ---\n{message}\n"
+                f"{day}\n<b>账户信息</b>\n{group}  {schedule}\n{res}")
 
     def main(self):
         msg_all = ''
@@ -47,9 +49,7 @@ class HiFiNi:
         return msg_all
 
 if __name__ == "__main__":
-    _data = get_data()
-    _check_items = _data.get("HIFINI", [])
-    result = HiFiNi(check_items=_check_items).main()
+    result = HiFiNi(check_items=get_data().get("HIFINI", [])).main()
     if '已经签过' in result:
         print(result)
     else:
