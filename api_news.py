@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-cron: 40 7 * * *
+cron: 40 7,17 * * *
 new Env('每日新闻');
 """
 
-import re
-import traceback
-import requests
-from notify_mtr import send
 from utils import get_data
+from notify_mtr import send
+import re, traceback, requests
 
 class News:
     @staticmethod
@@ -73,6 +71,20 @@ class News:
                     msg += "📮 每日新闻 📮\n"
                     for no, news_ in enumerate(data.get("newsList"), start=1):
                         msg += f'{str(no).zfill(2)}({news_.get("category")}). <a href="{news_.get("url")}">{news_.get("title")}</a>\n'
+                else:
+                    from bs4 import BeautifulSoup
+                    response = requests.get("https://news.topurl.cn")
+                    if response.status_code == 200:
+                        msg += "📮 每日新闻 📮\n"
+                        soup = BeautifulSoup(response.text, "html.parser")
+                        news_wrap = soup.find("div", class_="news-wrap")
+                        news_wraps = news_wrap.find_all("div", class_="line")
+                        links = [
+                            f'{index + 1}. <a href="{a_tag.get("href")}">{a_tag.text.strip()}</a>'
+                            for index, div in enumerate(news_wraps)
+                            for a_tag in [div.find("a")] if a_tag
+                        ]
+                        msg += "\n".join(links)
                 if data.get("historyList"):
                     msg += "\n🎬 历史上的今天 🎬\n"
                     for history in data.get("historyList"):
