@@ -47,10 +47,8 @@ class HDSky:
             imagestring = re.sub(r'[\W_]', '', imagestring)
             return imagestring if len(imagestring) == 6 else None
 
-        msg, count, max_count, s, cg_msg, url = '', 0, 5, HTMLSession(), \
-        '你今天已经签到了，请勿重复签到', 'https://hdsky.me/torrents.php'
-        headers = {"Cookie": cookie, 'authority': 'hdsky.me',
-                   'referer': url, 'origin': 'https://hdsky.me'}
+        msg, count, max_count, s, cg_msg, url, headers = '', 0, 5, HTMLSession(), \
+            '你今天已经签到了，请勿重复签到', 'https://hdsky.me/torrents.php', {"Cookie": cookie}
 
         try:
             r = s.get(url, headers=headers)
@@ -58,7 +56,7 @@ class HDSky:
                 return (f"<b><span style='color: red'>签到失败</span></b>\n"
                         f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-            if not '[已签到]' in r.text:
+            if '[签到]' in r.text:
                 while count < max_count:
                     imagehash, img_response = fetch_image_hash()
                     imagestring = recognize_captcha_text(img_response)
@@ -120,8 +118,7 @@ class HDSky:
         return msg_all
 
 if __name__ == "__main__":
-    _check_items = get_data().get("HDSKY", [])
-    result = HDSky(check_items=_check_items).main()
+    result = HDSky(check_items=get_data().get("HDSKY", [])).main()
     if '奖励' in result:
         send("HDSky 签到", result)
     else:

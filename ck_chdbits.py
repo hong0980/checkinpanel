@@ -21,8 +21,11 @@ class Get:
     @staticmethod
     def sign(cookie, i):
         def check_answer_values(value):
-            return not ((isinstance(value, str) and value in valid_values) \
-                   or (isinstance(value, list) and all(v in valid_values for v in value)))
+            if isinstance(value, str):
+                return value in valid_values
+            if isinstance(value, list):
+                return any(i in valid_values for i in value)
+            return False
 
         def generate_answer(r, value):
             if value:
@@ -31,9 +34,7 @@ class Get:
                     return match[0]
 
             from random import choice, sample
-            if '[多选]' in r.text:
-                return sample(valid_values, 3)
-            return choice(valid_values)
+            return sample(valid_values, 3) if '[多选]' in r.text else choice(valid_values)
 
         p, x, msg, cg_msg, now, g, url, valid_values = '', '', '', '', datetime.now(), \
         '使用数值答题', 'https://ptchdbits.co/bakatest.php', ('1', '2', '4', '8')
@@ -58,7 +59,7 @@ class Get:
                 qd_msg = re.findall(r'white">(.*?签到.*?)<', r.text)
                 if not '签过到了' in r.text:
                     answer = answers.get(question_id)
-                    if not answer or check_answer_values(answer):
+                    if not (answer and check_answer_values(answer)):
                         x = 1 if answer else 2
                         answer = generate_answer(r, answer)
 
@@ -130,9 +131,7 @@ class Get:
         return msg_all
 
 if __name__ == "__main__":
-    _data = get_data()
-    _check_items = _data.get("CHDBITS", [])
-    result = Get(check_items=_check_items).main()
+    result = Get(check_items=get_data().get("CHDBITS", [])).main()
     if '获得' in result:
         send("CHDBits 签到", result)
     else:
