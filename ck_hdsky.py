@@ -56,7 +56,7 @@ class HDSky:
                 return (f"<b><span style='color: red'>签到失败</span></b>\n"
                         f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-            if '[签到]' in r.text:
+            if not '[已签到]' in r.text:
                 while count < max_count:
                     imagehash, img_response = fetch_image_hash()
                     imagestring = recognize_captcha_text(img_response)

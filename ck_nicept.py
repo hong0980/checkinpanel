@@ -4,10 +4,9 @@ cron: 55 59 15,23 * * *
 new Env('NicePT 签到');
 """
 
-import re, time
+import re, time, requests
 from utils import get_data
 from notify_mtr import send
-from requests_html import HTMLSession
 from datetime import datetime, timedelta
 
 class NicePT:
@@ -16,45 +15,42 @@ class NicePT:
 
     @staticmethod
     def sign(cookie, i):
-        msg, now, s, headers = '', datetime.now(), HTMLSession(), {'Cookie': cookie}
-        sign_msg = '<b><span style="color: purple">你今天已经签到了，请勿重复签到</span></b>'
+        now, s, headers, msg = datetime.now(), requests.session(), {'Cookie': cookie}, \
+            f'<b><span style="color: purple">你今天已经签到了，请勿重复签到</span></b>\n'
         if now.hour == 23 and 57 <= now.minute <= 59:
             midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
             sleep_seconds = (midnight - now).total_seconds()
             print(f'等待{int(sleep_seconds)}秒后执行签到！')
             time.sleep(sleep_seconds)
 
-        r = s.get('https://www.nicept.net/torrents.php', headers=headers)
+        r = s.get(f'https://www.nicept.net/torrents.php', headers=headers)
         name = re.findall(r'<b>(.*?)</b>', r.text)
         name = name[0] if name else None
         if name is None:
             return (f"<b><span style='color: red'>签到失败</span></b>\n"
                     f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-        if not '簽到已得' in r.text:
-            r = s.get('https://www.nicept.net/attendance.php', headers=headers)
-            now_time = datetime.now().time()
-            details = re.findall(r'<p>(這是您的第.*?個魔力值。).*?(今日簽到排名：.*?)</span>', r.text)[0]
-            msg = f'{details[0]}{details[1]}\n'
-            sign_msg = f"<b><span style='color: green'>签到成功。</span></b> {now_time}"
-            if "簽到成功" not in r.text:
-                sign_msg = "<b><span style='color: red'>签到失败！</span></b>"
+        if '[簽到得魔力]' in r.text:
+            r = s.get(f'https://www.nicept.net/attendance.php', headers=headers)
+            m = re.search(r'<p>(這是您的第.*?個魔力值。).*?(今日簽到排名：.*?)</span>', r.text)
+            msg = (f"<b><span style='color: green'>签到成功。</span></b> "
+                   f"{datetime.now().time()}\n{m.group(1)}{m.group(2)}\n"
+                   if m and "獲得" in m.group(1) else f"<b><span style='color: red'>签到失败！</span></b>\n")
 
         pattern = (r'魔力值.*?:\s*(.*?)\s*<a.*?'
                    r'分享率：</font>\s*(.*?)\s*<font.*?'
                    r'上傳量：</font>\s*(.*?)\s*<font.*?'
                    r'下載量：</font>\s*(.*?)\s*<font.*?'
                    r'當前做種.*?>(\d+)\s*<img')
-        result = re.findall(pattern, r.text, re.DOTALL)[0]
+        m = re.search(pattern, r.text, re.DOTALL)
         msg += (f'\n<b>账户信息：</b>\n'
-                f'魔力值：{result[0]}\n'
-                f'分享率：{result[1]}\n'
-                f'上传量：{result[2]}\n'
-                f'下载量：{result[3]}\n'
-                f'当前做种：{result[4]}\n')
+                f'魔力值：{m.group(1)}\n'
+                f'分享率：{m.group(2)}\n'
+                f'上传量：{m.group(3)}\n'
+                f'下载量：{m.group(4)}\n'
+                f'当前做种：{m.group(5)}')
 
-        return (f"---- {name} NicePT 签到结果 ----\n"
-                f"{sign_msg}\n{msg}")
+        return (f"---- {name} NicePT 签到结果 ----\n{msg}")
 
     def main(self):
         msg_all = ''
@@ -63,8 +59,8 @@ class NicePT:
         return msg_all
 
 if __name__ == "__main__":
-    _data = get_data()
-    _check_items = _data.get("NICEPT", [])
-    result = NicePT(check_items=_check_items).main()
-    send("NicePT 签到", result)
-    # print(result)
+    result = NicePT(check_items=get_data().get("NICEPT", [])).main()
+    if '獲得' in result:
+        send("NicePT 签到", result)
+    else:
+        print(result)
