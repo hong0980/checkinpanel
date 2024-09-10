@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-cron: 40 1 0 * * *
+cron: 40 1 0,12 * * *
 new Env('智能电视网 签到');
 """
 import re
-from time import sleep
 from utils import get_data
 from notify_mtr import send
 from requests_html import HTMLSession
@@ -16,10 +15,9 @@ class znds:
     @staticmethod
     def sign(cookie, i):
         try:
-            s = HTMLSession()
-            url = 'https://www.znds.com/'
-            s.cookies.set('Cookie', cookie)
+            s, url = HTMLSession(), 'https://www.znds.com/'
             sign_msg = "<b><span style='color: red'>签到失败</span></b>"
+            s.cookies.set('Cookie', cookie)
             s.headers.update({'referer': url, 'authority': 'www.znds.com'})
             r = s.get(url)
             name = r.html.search('title="访问我的空间">{}</a>')
@@ -30,9 +28,8 @@ class znds:
 
             formhash = re.findall(r'action=logout&amp;formhash=(\w+)">退出', r.text)
             r = s.get(f'{url}plugin.php', params={
-                'id': 'ljdaka:daka', 'handlekey': 'ljdaka',
-                'inajax': '1', 'action': 'msg', 'infloat': 'yes',
-                'formhash': formhash, 'ajaxtarget': 'fwin_content_ljdaka'
+                'inajax': '1', 'id': 'ljdaka:daka', 'infloat': 'yes', 'formhash': formhash,
+                'handlekey': 'ljdaka', 'action': 'msg', 'ajaxtarget': 'fwin_content_ljdaka'
             })
             match = re.search(r'<div class="alert_info"><p>(.*?)</p></div>', r.text)
             if match:
@@ -59,8 +56,8 @@ class znds:
         return msg_all
 
 if __name__ == "__main__":
-    _data = get_data()
-    _check_items = _data.get("ZNDS", [])
-    result = znds(check_items=_check_items).main()
-    send("智能电视网  签到", result)
-    # print(result)
+    result = znds(check_items=get_data().get("ZNDS", [])).main()
+    if '成功' in result:
+        send("智能电视网 签到", result)
+    else:
+        print(result)

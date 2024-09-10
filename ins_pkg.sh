@@ -8,7 +8,7 @@ COMMENT
 
 . utils_env.sh
 get_some_path
-checkinpanel_master=$(find "${SCR_PATH}" -type d -name "*checkinpanel_master" -print -quit 2>/dev/null \
+checkinpanel_master=$(find "${SCR_PATH}" -type d -name "*checkinpanel*" -print -quit 2>/dev/null \
                     || echo "OreosLab_checkinpanel_master")
 checkinpanel_master=${checkinpanel_master##*/}
 

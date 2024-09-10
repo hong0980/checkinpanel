@@ -3,7 +3,7 @@
 # shellcheck disable=SC2005,2188
 <<'COMMENT'
 cron: 1 1 1 1 *
-new Env('安装 selenium-tesseract);
+new Env('安装 selenium tesseract);
 COMMENT
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"

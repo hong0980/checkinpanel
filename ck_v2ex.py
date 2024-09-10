@@ -68,8 +68,8 @@ class V2ex:
         return msg_all
 
 if __name__ == "__main__":
-    _data = get_data()
-    _check_items = _data.get("V2EX", [])
-    result = V2ex(check_items=_check_items).main()
-    send("V2EX 签到", result)
-    # print(result)
+    result = V2ex(check_items=get_data().get("V2EX", [])).main()
+    if '签到成功' in result:
+        send("V2EX 签到", result)
+    else:
+        print(result)
