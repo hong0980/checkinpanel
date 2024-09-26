@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 10 1 0 * * *
+cron: 10 1 0,15 * * *
 new Env('PTHOME 签到');
 """
 import re, requests
@@ -14,14 +14,13 @@ class PTHOME:
     @staticmethod
     def sign(cookie, i):
         session = requests.session()
-        url = 'http://pthome.net/attendance.php'
         headers = {
             "Cookie": cookie,
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/102.0.0.0 Safari/537.36",
         }
-        r = session.get(url, headers=headers)
+        r = session.get('http://pthome.net/attendance.php', headers=headers)
         name = re.findall(r'<b>(.*?)</b>', r.text)
         name = name[0] if name else None
         if name is None:
@@ -36,13 +35,10 @@ class PTHOME:
                    r'当前做种.*?>\s*(\d+)\s*<')
         result = re.findall(pattern, r.text, re.DOTALL)[0]
         msg = (f'<b>账户信息：</b>\n'
-               f'魔力值：{result[0]}\n'
-               f'做种积分：{result[1]}\n'
-               f'分享率：{result[2]}\n'
-               f'上传量：{result[3]}\n'
-               f'下载量：{result[4]}\n'
-               f'当前做种：{result[5]}\n'
-        )
+               f'魔力值：{result[0]}\n做种积分：{result[1]}\n'
+               f'分享率：{result[2]}\n上传量：{result[3]}\n'
+               f'下载量：{result[4]}\n当前做种：{result[5]}')
+
         res = f"---- {name} PTHOME 签到结果 ----\n"
         if "签到成功" in r.text:
             g = re.findall(r'<p>(这是您.*?魔力值。)</p>', r.text)[0]
@@ -55,15 +51,15 @@ class PTHOME:
         return res
 
     def main(self):
-        msg_all = ""
+        msg_all = ''
         for i, check_item in enumerate(self.check_items, start=1):
             cookie = check_item.get("cookie")
             msg_all += f'{self.sign(cookie, i)}\n\n'
         return msg_all
 
 if __name__ == "__main__":
-    _data = get_data()
-    _check_items = _data.get("PTHOME", [])
-    result = PTHOME(check_items=_check_items).main()
-    send("PTHOME 签到", result)
-    # print(result)
+    result = PTHOME(check_items=get_data().get("PTHOME", [])).main()
+    if '获得' in result:
+        send("PTHOME 签到", result)
+    else:
+        print(result)

@@ -12,8 +12,8 @@ class News:
     @staticmethod
     def parse_data(data, topic):
         if not data.get(topic):
-            return ""
-        msg = ""
+            return ''
+        msg = ''
         for key, value in data.get(topic).items():
             if key == "content":
                 msg += "\n".join(str(i) for i in value)
@@ -43,12 +43,14 @@ class News:
         return msg
 
     def process_calendar_data(self, calendar_data):
-        term_info = ""
+        term_info = ''
         if calendar_data['isTerm']:
             term_info = f"节气：{calendar_data['term']}\n"
         msg = (
-            f"公历日期：{calendar_data['cYear']}年{calendar_data['cMonth']}月{calendar_data['cDay']}日  {calendar_data['ncWeek']}\n"
-            f"农历日期：{calendar_data['yearCn']}({calendar_data['animal']}年) {calendar_data['monthCn']}{calendar_data['dayCn']}\n"
+            f"公历日期：{calendar_data['cYear']}年{calendar_data['cMonth']}月"
+            f"{calendar_data['cDay']}日  {calendar_data['ncWeek']}\n"
+            f"农历日期：{calendar_data['yearCn']}({calendar_data['animal']}年) "
+            f"{calendar_data['monthCn']}{calendar_data['dayCn']}\n"
             f"干支年：{calendar_data['gzYear']}年\n"
             f"干支月：{calendar_data['gzMonth']}月\n"
             f"干支日：{calendar_data['gzDay']}日\n"
@@ -57,7 +59,7 @@ class News:
         return msg
 
     def main(self):
-        msg = ""
+        msg = ''
         try:
             res = requests.get("https://news.topurl.cn/api?count=20").json()
             if res.get("code") == 200:
@@ -67,18 +69,19 @@ class News:
                     msg += self.process_weather_data(weather_data)
                 if data.get("calendar"):
                     msg += "📅 日历 📅\n" + self.process_calendar_data(data["calendar"])
-                if data.get("newsList"):
+                if not data.get("newsList"):
                     msg += "📮 每日新闻 📮\n"
                     for no, news_ in enumerate(data.get("newsList"), start=1):
-                        msg += f'{str(no).zfill(2)}({news_.get("category")}). <a href="{news_.get("url")}">{news_.get("title")}</a>\n'
+                        msg += (f'{str(no).zfill(2)}'
+                                f'({news_.get("category")}). <a href="{news_.get("url")}">'
+                                f'{news_.get("title")}</a>\n')
                 else:
                     from bs4 import BeautifulSoup
                     response = requests.get("https://news.topurl.cn")
                     if response.status_code == 200:
                         msg += "📮 每日新闻 📮\n"
                         soup = BeautifulSoup(response.text, "html.parser")
-                        news_wrap = soup.find("div", class_="news-wrap")
-                        news_wraps = news_wrap.find_all("div", class_="line")
+                        news_wraps = soup.select("div.news-wrap div.line")
                         links = [
                             f'{index + 1}. <a href="{a_tag.get("href")}">{a_tag.text.strip()}</a>'
                             for index, div in enumerate(news_wraps)

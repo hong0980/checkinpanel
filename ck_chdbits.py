@@ -11,6 +11,8 @@ except ImportError:
     sys.exit(1)
 from utils import get_data
 from notify_mtr import send
+from selenium import webdriver
+from selenium_stealth import stealth
 from requests_html import HTMLSession
 from datetime import datetime, timedelta
 
@@ -36,6 +38,24 @@ class Get:
             from random import choice, sample
             return sample(valid_values, 3) if '[多选]' in r.text else choice(valid_values)
 
+        options = webdriver.ChromeOptions()
+        options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+
+        service = webdriver.ChromeService(
+            log_output='/tmp/chdbits_service.log',
+            executable_path='/usr/bin/chromedriver'
+        )
+        driver = webdriver.Chrome(service=service, options=options)
+        stealth(driver,
+            platform="Win32",
+            fix_hairline=True,
+            vendor="Google Inc.",
+            languages=["zh-CN", "zh"],
+            webgl_vendor="Intel Inc.",
+            renderer="Intel Iris OpenGL Engine",
+        )
+
         p, x, msg, cg_msg, now, g, url, valid_values = '', '', '', '', datetime.now(), \
         '使用数值答题', 'https://ptchdbits.co/bakatest.php', ('1', '2', '4', '8')
         headers = {'referer': url, 'authority': 'ptchdbits.co',
@@ -43,15 +63,16 @@ class Get:
 
         try:
             with HTMLSession(executablePath='/usr/bin/chromium') as s:
+                driver.get(url)
                 if now.hour == 23 and 57 <= now.minute <= 59:
-                    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+                    midnight = now.replace(hour=0, minute=0, second=0, microsecond=500000) + timedelta(days=1)
                     sleep_seconds = (midnight - now).total_seconds()
                     print(f'等待{int(sleep_seconds)}秒后执行签到！')
                     time.sleep(sleep_seconds)
 
                 r = s.get(url, headers=headers)
-                question_id = r.html.search('name="questionid" value="{}"')
-                question_id = question_id[0] if question_id else None
+                questionid = r.html.search('name="questionid" value="{}"')
+                question_id = questionid[0] if questionid else None
                 if question_id is None:
                     return (f"<b><span style='color: red'>签到失败</span></b>\n"
                             f"账号({i})无法登录！可能Cookie失效，请重新修改")
@@ -121,6 +142,8 @@ class Get:
         except Exception:
             import traceback
             return f"<b><span style='color: red'>未知异常：</span></b>\n{traceback.format_exc()}"
+        finally:
+            driver.quit()
         return res
 
     def main(self):
@@ -132,7 +155,7 @@ class Get:
 
 if __name__ == "__main__":
     result = Get(check_items=get_data().get("CHDBITS", [])).main()
-    if '获得' in result:
+    if '获得' in result or '签到失败' in result:
         send("CHDBits 签到", result)
     else:
         print(result)
