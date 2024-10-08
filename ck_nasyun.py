@@ -53,7 +53,7 @@ class NASYUN:
 
 if __name__ == "__main__":
     result = NASYUN(check_items=get_data().get("NASYUN", [])).main()
-    if '成功' in result:
+    if '成功' in result or '签到失败' in result or '请求失败' in result:
         send("那是云 签到", result)
     else:
         print(result)

@@ -21,34 +21,37 @@ class PTHOME:
             "Chrome/102.0.0.0 Safari/537.36",
         }
         r = session.get('http://pthome.net/attendance.php', headers=headers)
-        name = re.findall(r'<b>(.*?)</b>', r.text)
-        name = name[0] if name else None
-        if name is None:
-            return (f"<b><span style='color: red'>签到失败</span></b>\n"
-                    f"账号({i})无法登录！可能Cookie失效，请重新修改")
+        if r.status_code == 200:
+            name = re.findall(r'<b>(.*?)</b>', r.text)
+            name = name[0] if name else None
+            if name is None:
+                return (f"<b><span style='color: red'>签到失败</span></b>\n"
+                        f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-        pattern = (r'使用</a>]: (.*?)&nbsp;.*?'
-                   r'做种积分.*?</a>(.*?)\s*<font.*?'
-                   r'分享率：</font>\s*(.*?)\s*<font.*?'
-                   r'上传量：</font>\s*(.*?)\s*<font.*?'
-                   r'下载量：</font>\s*(.*?)\s*<font.*?'
-                   r'当前做种.*?>\s*(\d+)\s*<')
-        result = re.findall(pattern, r.text, re.DOTALL)[0]
-        msg = (f'<b>账户信息：</b>\n'
-               f'魔力值：{result[0]}\n做种积分：{result[1]}\n'
-               f'分享率：{result[2]}\n上传量：{result[3]}\n'
-               f'下载量：{result[4]}\n当前做种：{result[5]}')
+            pattern = (r'使用</a>]: (.*?)&nbsp;.*?'
+                       r'做种积分.*?</a>(.*?)\s*<font.*?'
+                       r'分享率：</font>\s*(.*?)\s*<font.*?'
+                       r'上传量：</font>\s*(.*?)\s*<font.*?'
+                       r'下载量：</font>\s*(.*?)\s*<font.*?'
+                       r'当前做种.*?>\s*(\d+)\s*<')
+            result = re.findall(pattern, r.text, re.DOTALL)[0]
+            msg = (f'<b>账户信息：</b>\n'
+                   f'魔力值：{result[0]}\n做种积分：{result[1]}\n'
+                   f'分享率：{result[2]}\n上传量：{result[3]}\n'
+                   f'下载量：{result[4]}\n当前做种：{result[5]}')
 
-        res = f"---- {name} PTHOME 签到结果 ----\n"
-        if "签到成功" in r.text:
-            g = re.findall(r'<p>(这是您.*?魔力值。)</p>', r.text)[0]
-            res += f"<b><span style='color: green'>签到成功</span></b>\n{g}\n\n{msg}" 
-        elif "抱歉" in r.text:
-            g = re.findall(r'\((签到已得\d+)\)', r.text)[0]
-            res += f"<b><span style='color: green'>您今天已经签到过了，请勿重复刷新。</span></b>\n今天{g}魔力值\n\n{msg}"
+            res = f"---- {name} PTHOME 签到结果 ----\n"
+            if "签到成功" in r.text:
+                g = re.findall(r'<p>(这是您.*?魔力值。)</p>', r.text)[0]
+                return f"<b><span style='color: green'>签到成功</span></b>\n{g}\n\n{msg}" 
+            elif "抱歉" in r.text:
+                g = re.findall(r'\((签到已得\d+)\)', r.text)[0]
+                return (f"<b><span style='color: green'>您今天已经签到过了，请勿重复刷新。</span></b>"
+                        f"\n今天{g}魔力值\n\n{msg}")
+            else:
+                return "<b><span style='color: red'>签到失败</span></b>"
         else:
-            res += "<b><span style='color: red'>签到失败</span></b>"
-        return res
+            return f"请求失败，状态码：{r.status_code}"
 
     def main(self):
         msg_all = ''
@@ -59,7 +62,7 @@ class PTHOME:
 
 if __name__ == "__main__":
     result = PTHOME(check_items=get_data().get("PTHOME", [])).main()
-    if '获得' in result:
+    if '获得' in result or '签到失败' in result or '请求失败' in result:
         send("PTHOME 签到", result)
     else:
         print(result)

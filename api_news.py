@@ -69,7 +69,7 @@ class News:
                     msg += self.process_weather_data(weather_data)
                 if data.get("calendar"):
                     msg += "📅 日历 📅\n" + self.process_calendar_data(data["calendar"])
-                if not data.get("newsList"):
+                if data.get("newsList"):
                     msg += "📮 每日新闻 📮\n"
                     for no, news_ in enumerate(data.get("newsList"), start=1):
                         msg += (f'{str(no).zfill(2)}'

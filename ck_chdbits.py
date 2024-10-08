@@ -64,80 +64,84 @@ class Get:
         try:
             with HTMLSession(executablePath='/usr/bin/chromium') as s:
                 driver.get(url)
+                r = s.get(url, headers=headers)
                 if now.hour == 23 and 57 <= now.minute <= 59:
-                    midnight = now.replace(hour=0, minute=0, second=0, microsecond=500000) + timedelta(days=1)
+                    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
                     sleep_seconds = (midnight - now).total_seconds()
                     print(f'等待{int(sleep_seconds)}秒后执行签到！')
                     time.sleep(sleep_seconds)
 
                 r = s.get(url, headers=headers)
-                questionid = r.html.search('name="questionid" value="{}"')
-                question_id = questionid[0] if questionid else None
-                if question_id is None:
-                    return (f"<b><span style='color: red'>签到失败</span></b>\n"
-                            f"账号({i})无法登录！可能Cookie失效，请重新修改")
+                if r.status_code == 200:
+                    questionid = r.html.search('name="questionid" value="{}"')
+                    question_id = questionid[0] if questionid else None
+                    if question_id is None:
+                        return (f"<b><span style='color: red'>签到失败</span></b>\n"
+                                f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-                qd_msg = re.findall(r'white">(.*?签到.*?)<', r.text)
-                if not '签过到了' in r.text:
-                    answer = answers.get(question_id)
-                    if not (answer and check_answer_values(answer)):
-                        x = 1 if answer else 2
-                        answer = generate_answer(r, answer)
+                    qd_msg = re.findall(r'white">(.*?签到.*?)<', r.text)
+                    if not '签过到了' in r.text:
+                        answer = answers.get(question_id)
+                        if not (answer and check_answer_values(answer)):
+                            x = 1 if answer else 2
+                            answer = generate_answer(r, answer)
 
-                    data = {'choice[]': answer, 'questionid': question_id,
-                            'wantskip': '不会', 'usercomment': '此刻心情:无'}
-                    p = s.post(url, headers=headers, data=data)
-                    now_time = datetime.now().time()
-                    question = re.findall(r'](\[.选\])\s*?请问：(.*?)</td>', r.text)[0]
-                    table_tag = r.html.find('table[border="1"]', first=True)
-                    question_text = table_tag.find('td')[1].text.strip()
-                    msg = (f'<b><span style="color: orange">题目 {question_id}</span></b>\n'
-                           f'{question[0]}：{question[1]}\n{question_text}\n\n')
-                    if x:
-                        g = f'{"使用题目答题" if x == 1 else "使用随机答题"}：{answer}'
-                        tr_tags = table_tag.find('tr')[:2]
-                        with open('/tmp/chdbits_非数值答案题目.html.txt', 'a', encoding='utf-8') as file:
-                            for tr in tr_tags:
-                                file.write(tr.html + '\n')
-                            file.write('\n')
+                        data = {'choice[]': answer, 'questionid': question_id,
+                                'wantskip': '不会', 'usercomment': '此刻心情:无'}
+                        p = s.post(url, headers=headers, data=data)
+                        now_time = datetime.now().time()
+                        question = re.findall(r'](\[.选\])\s*?请问：(.*?)</td>', r.text)[0]
+                        table_tag = r.html.find('table[border="1"]', first=True)
+                        question_text = table_tag.find('td')[1].text.strip()
+                        msg = (f'<b><span style="color: orange">题目 {question_id}</span></b>\n'
+                               f'{question[0]}：{question[1]}\n{question_text}\n\n')
+                        if x:
+                            g = f'{"使用题目答题" if x == 1 else "使用随机答题"}：{answer}'
+                            tr_tags = table_tag.find('tr')[:2]
+                            with open('/tmp/chdbits_非数值答案题目.html.txt', 'a', encoding='utf-8') as file:
+                                for tr in tr_tags:
+                                    file.write(tr.html + '\n')
+                                file.write('\n')
 
-                    msg += f"<b><span style='color: {'orange' if '数值' in g else 'red'}'>{g}</span></b>\n"
-                    for values in answer:
-                        question_text = re.findall(rf"value='{values}'\s*>(.*?)<", r.text, re.DOTALL)[0]
-                        question_text = re.sub(r"&nbsp;|&quot;", '', question_text)
-                        msg += f'{question_text}\n'
-                    msg += '\n'
+                        msg += f"<b><span style='color: {'orange' if '数值' in g else 'red'}'>{g}</span></b>\n"
+                        for values in answer:
+                            question_text = re.findall(rf"value='{values}'\s*>(.*?)<", r.text, re.DOTALL)[0]
+                            question_text = re.sub(r"&nbsp;|&quot;", '', question_text)
+                            msg += f'{question_text}\n'
+                        msg += '\n'
 
-                    qd_msg = re.findall(r'white">(.*?签到.*?)<', p.text)
-                    if '获得' in qd_msg[0]:
-                        cg_msg = f"<b><span style='color: green'>签到成功</span></b> {now_time}\n"
-                        with open('/tmp/chdbits_成功.html.txt', 'w', encoding='utf-8') as file:
-                            file.write(p.html.html)
-                    elif not '签过到了' in qd_msg[0]:
-                        cg_msg = "<b><span style='color: red'>签到失败</span></b>\n"
+                        qd_msg = re.findall(r'white">(.*?签到.*?)<', p.text)
+                        if '获得' in qd_msg[0]:
+                            cg_msg = f"<b><span style='color: green'>签到成功</span></b> {now_time}\n"
+                            with open('/tmp/chdbits_成功.html.txt', 'w', encoding='utf-8') as file:
+                                file.write(p.html.html)
+                        elif not '签过到了' in qd_msg[0]:
+                            cg_msg = "<b><span style='color: red'>签到失败</span></b>\n"
 
-                pattern = (r"UltimateUser_Name'><b>(.*?)</b>.*?"
-                           r'使用</a>]:\s*?(.*?)\s*?<.*?'
-                           r'分享率：</font>\s*?(.*?)\s*?<.*?'
-                           r'上传量：</font>\s*?(.*?)\s*?<.*?'
-                           r'下载量：</font>\s*?(.*?)\s*?<.*?'
-                           r'当前做种.*?(\d+).*?<.*?'
-                           r'做种积分: </font>\s*?(.*?)<')
-                text_search = p.text if p else r.text
-                result = re.findall(pattern, text_search, re.DOTALL)[0]
-                res = (f"--- {result[0]} CHDBits 签到结果 ---\n{cg_msg}<b><span style='color: "
-                       f"{'purple' if '签过到了' in qd_msg[0] else 'orange'}'>{qd_msg[0]}</span></b>\n\n"
-                       f'{msg}<b><span style="color: orange">账户信息</span></b>\n'
-                       f'魔力值：{result[1]}\n分享率：{result[2]}\n'
-                       f'上传量：{result[3]}\n下载量：{result[4]}\n'
-                       f'当前做种：{result[5]}\n做种积分：{result[6]}')
+                    pattern = (r"UltimateUser_Name'><b>(.*?)</b>.*?"
+                               r'使用</a>]:\s*?(.*?)\s*?<.*?'
+                               r'分享率：</font>\s*?(.*?)\s*?<.*?'
+                               r'上传量：</font>\s*?(.*?)\s*?<.*?'
+                               r'下载量：</font>\s*?(.*?)\s*?<.*?'
+                               r'当前做种.*?(\d+).*?<.*?'
+                               r'做种积分: </font>\s*?(.*?)<')
+                    text_search = p.text if p else r.text
+                    result = re.findall(pattern, text_search, re.DOTALL)[0]
+                    res = (f"--- {result[0]} CHDBits 签到结果 ---\n{cg_msg}<b><span style='color: "
+                           f"{'purple' if '签过到了' in qd_msg[0] else 'orange'}'>{qd_msg[0]}</span></b>\n\n"
+                           f'{msg}<b><span style="color: orange">账户信息</span></b>\n'
+                           f'魔力值：{result[1]}\n分享率：{result[2]}\n'
+                           f'上传量：{result[3]}\n下载量：{result[4]}\n'
+                           f'当前做种：{result[5]}\n做种积分：{result[6]}')
 
-                for matchs in re.findall(r"title='(.*?)'\s*>(\d+)</td>", text_search):
-                    if not answers.check_key(matchs[1]):
-                        f = f"'{matchs[1]}': '',  # {matchs[0]}"
-                        print(f)
-                        with open('/tmp/chdbits_题目.txt', 'a', encoding='utf-8') as file:
-                            file.write(f + '\n')
+                    for matchs in re.findall(r"title='(.*?)'\s*>(\d+)</td>", text_search):
+                        if not answers.check_key(matchs[1]):
+                            f = f"'{matchs[1]}': '',  # {matchs[0]}"
+                            print(f)
+                            with open('/tmp/chdbits_题目.txt', 'a', encoding='utf-8') as file:
+                                file.write(f + '\n')
+                else:
+                    res = f"请求失败，状态码：{r.status_code}"
 
         except Exception:
             import traceback
@@ -155,7 +159,7 @@ class Get:
 
 if __name__ == "__main__":
     result = Get(check_items=get_data().get("CHDBITS", [])).main()
-    if '获得' in result or '签到失败' in result:
+    if '获得' in result or '签到失败' in result or '请求失败' in result:
         send("CHDBits 签到", result)
     else:
         print(result)

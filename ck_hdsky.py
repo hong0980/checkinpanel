@@ -52,58 +52,61 @@ class HDSky:
 
         try:
             r = s.get(url, headers=headers)
-            if "未登录!" in r.text:
-                return (f"<b><span style='color: red'>签到失败</span></b>\n"
-                        f"账号({i})无法登录！可能Cookie失效，请重新修改")
+            if r.status_code == 200:
+                if "未登录!" in r.text:
+                    return (f"<b><span style='color: red'>签到失败</span></b>\n"
+                            f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-            if not '[已签到]' in r.text:
-                while count < max_count:
-                    imagehash, img_response = fetch_image_hash()
-                    imagestring = recognize_captcha_text(img_response)
+                if not '[已签到]' in r.text:
+                    while count < max_count:
+                        imagehash, img_response = fetch_image_hash()
+                        imagestring = recognize_captcha_text(img_response)
 
-                    short_imagehash = f"{imagehash[:3]}...{imagehash[-3:]}"
-                    if imagestring:
-                        print(f"识别到 {short_imagehash} 验证码: {imagestring}，执行第 {count + 1} 次签到。")
-                        data = {'action': 'showup', 'imagehash': imagehash, 'imagestring': imagestring}
-                        p = s.post('https://hdsky.me/showup.php', headers=headers, data=data).json()
-                        success, message = p.get('success'), p.get('message')
+                        short_imagehash = f"{imagehash[:3]}...{imagehash[-3:]}"
+                        if imagestring:
+                            print(f"识别到 {short_imagehash} 验证码: {imagestring}，执行第 {count + 1} 次签到。")
+                            data = {'action': 'showup', 'imagehash': imagehash, 'imagestring': imagestring}
+                            p = s.post('https://hdsky.me/showup.php', headers=headers, data=data).json()
+                            success, message = p.get('success'), p.get('message')
 
-                        if isinstance(message, int):
-                            msg = "<b><span style='color: green'>签到成功</span></b>\n"
-                            cg_msg = (f"已连续签到 {int((message - 10) / 2 + 1)} 天，"
-                                      f"奖励 {message} 魔力值，明日继续签到可获得 {message + 2} 魔力值")
-                            r = s.get(url, headers=headers)
-                            break
-                        elif message == 'date_unmatch':
-                            break
-                        elif message == 'invalid_imagehash':
-                            count += 1
-                            if count != max_count:
-                                print(f"验证码错误。5 秒后重新获取验证，尝试重新签到。")
-                                time.sleep(5)
+                            if isinstance(message, int):
+                                msg = "<b><span style='color: green'>签到成功</span></b>\n"
+                                cg_msg = (f"已连续签到 {int((message - 10) / 2 + 1)} 天，"
+                                          f"奖励 {message} 魔力值，明日继续签到可获得 {message + 2} 魔力值")
+                                r = s.get(url, headers=headers)
+                                break
+                            elif message == 'date_unmatch':
+                                break
+                            elif message == 'invalid_imagehash':
+                                count += 1
+                                if count != max_count:
+                                    print(f"验证码错误。5 秒后重新获取验证，尝试重新签到。")
+                                    time.sleep(5)
+                                else:
+                                    msg = "<b><span style='color: red'>签到失败/span></b>\n"
+                                    cg_msg = f"验证码错误。已经尝试 {max_count} 次签到，稍后再试。"
+                                    print(cg_msg)
                             else:
-                                msg = "<b><span style='color: red'>签到失败/span></b>\n"
-                                cg_msg = f"验证码错误。已经尝试 {max_count} 次签到，稍后再试。"
+                                cg_msg = f"失败，信息：{message if message else '未知'}"
                                 print(cg_msg)
                         else:
-                            cg_msg = f"失败，信息：{message if message else '未知'}"
-                            print(cg_msg)
-                    else:
-                        print(f"识别到 {short_imagehash} 的验证码不符合要求。5 秒后重新获取验证。")
-                        time.sleep(5)
+                            print(f"识别到 {short_imagehash} 的验证码不符合要求。5 秒后重新获取验证。")
+                            time.sleep(5)
 
-            pattern = (r'InsaneUser_Name\'><b>(.*?)</b>.*?'
-                       r'使用</a>]: (.*?)\s*'
-                       r'<font.*?分享率：</font>\s*(.*?)\s*'
-                       r'<font.*?上传量：</font>\s*(.*?)\s*'
-                       r'<font.*?下载量：</font>\s*(.*?)\s*'
-                       r'<font.*?当前做种.*?>\s*(\d+)\s*<img')
-            result = re.findall(pattern, r.text, re.DOTALL)[0]
-            res = (f"--- {result[0]} HDSky 签到结果 ---\n{msg}<b><span style='color: "
-                   f"{'purple' if '今天已经签到了' in cg_msg else 'orange'}'>{cg_msg}</span></b>\n\n"
-                   f'<b>账户信息</b>\n魔力值：{result[1]}\n'
-                   f'分享率：{result[2]}\n上传量：{result[3]}\n'
-                   f'下载量：{result[4]}\n当前做种：{result[5]}')
+                pattern = (r'InsaneUser_Name\'><b>(.*?)</b>.*?'
+                           r'使用</a>]: (.*?)\s*'
+                           r'<font.*?分享率：</font>\s*(.*?)\s*'
+                           r'<font.*?上传量：</font>\s*(.*?)\s*'
+                           r'<font.*?下载量：</font>\s*(.*?)\s*'
+                           r'<font.*?当前做种.*?>\s*(\d+)\s*<img')
+                result = re.findall(pattern, r.text, re.DOTALL)[0]
+                res = (f"--- {result[0]} HDSky 签到结果 ---\n{msg}<b><span style='color: "
+                       f"{'purple' if '今天已经签到了' in cg_msg else 'orange'}'>{cg_msg}</span></b>\n\n"
+                       f'<b>账户信息</b>\n魔力值：{result[1]}\n'
+                       f'分享率：{result[2]}\n上传量：{result[3]}\n'
+                       f'下载量：{result[4]}\n当前做种：{result[5]}')
+            else:
+                res = f"请求失败，状态码：{r.status_code}"
 
         except Exception:
             import traceback
@@ -119,7 +122,7 @@ class HDSky:
 
 if __name__ == "__main__":
     result = HDSky(check_items=get_data().get("HDSKY", [])).main()
-    if '奖励' in result:
+    if '奖励' in result or '签到失败' in result or '请求失败' in result:
         send("HDSky 签到", result)
     else:
         print(result)
