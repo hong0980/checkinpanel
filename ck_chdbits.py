@@ -88,8 +88,8 @@ class Get:
 
                         data = {'choice[]': answer, 'questionid': question_id,
                                 'wantskip': '不会', 'usercomment': '此刻心情:无'}
-                        p = s.post(url, headers=headers, data=data)
                         now_time = datetime.now().time()
+                        p = s.post(url, headers=headers, data=data)
                         question = re.findall(r'](\[.选\])\s*?请问：(.*?)</td>', r.text)[0]
                         table_tag = r.html.find('table[border="1"]', first=True)
                         question_text = table_tag.find('td')[1].text.strip()
