@@ -8,63 +8,97 @@ import re
 from utils import get_data
 from notify_mtr import send
 from datetime import datetime
-from requests_html import HTMLSession
+from selenium import webdriver
+from selenium_stealth import stealth
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException
 
 class V2ex:
     def __init__(self, check_items):
         self.check_items = check_items
-        self.url = "https://www.v2ex.com/mission/daily"
 
-    def sign(self, cookie, proxy, i):
+    @staticmethod
+    def sign(cookie, i):
+        options = webdriver.ChromeOptions()
+        options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+        options.add_argument("start-maximized")
+        options.add_argument('--disable-dev-shm-usage')
+
+        service = webdriver.ChromeService(
+            log_output='/tmp/v2ex.log',
+            executable_path='/usr/bin/chromedriver',
+            service_args=['--readable-timestamp']
+        )
+
+        driver = webdriver.Chrome(service=service, options=options)
+        stealth(driver,
+            platform="Win32",
+            fix_hairline=True,
+            vendor="Google Inc.",
+            languages=["zh-CN", "zh"],
+            webgl_vendor="Intel Inc.",
+            renderer="Intel Iris OpenGL Engine",
+        )
+
+        res = ''
         try:
-            s = HTMLSession()
-            s.headers.update({
-                "referer": self.url,
-                "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
-                "accept": "text/html,application/xhtml+xml,application/xml;"
-                "q=0.9,image/webp,image/apng,*/*;"
-                "q=0.8,application/signed-exchange;v=b3;q=0.9",
-            })
-            s.cookies.update({
-                item.split("=")[0]: item.split("=", 1)[1]
-                for item in cookie.split("; ")
-            })
-            if proxy:
-                s.proxies.update({"http": proxy, "https": proxy})
+            driver.get('https://www.v2ex.com/signin')
+            for single_cookie in cookie.split('; '):
+                name, value = single_cookie.split('=', 1)
+                driver.add_cookie({'name': name, 'value': value})
+            driver.get('https://www.v2ex.com/mission/daily')
 
-            r = s.get(self.url)
-            urls = r.html.search('onclick="location.href = \'{}\';"')
-            url = urls[0] if urls else None
-            if url is None:
-                return (f"<b><span style='color: red'>签到失败</span></b>\n"
-                        f"账号({i})无法登录！可能Cookie失效，请重新修改")
+            if '注册' in driver.page_source:
+                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
-            sign_msg = f"<b><span style='color: orange'>今天已经签到过了</span></b>"
-            if 'once' in url:
-                r = s.get(f'https://www.v2ex.com{url}')
-                sign_msg = f"<b><span style='color: green'>签到成功</span></b>"
-            username = r.html.find('span.bigger', first=True)
-            datas = re.findall(r'>(已连续登录 \d+ 天)<', r.text)
+            sign_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[type="button"]'))
+            )
+            name_element = driver.find_element(By.XPATH, '//span[@class="bigger"]')
+            msg = f"---- {name_element.text} V2EX 签到状态 ----\n"
 
-            p = s.get('https://www.v2ex.com/balance')
-            today = re.findall(rf'{datetime.now().strftime("%Y%m%d")}.*?(每日登录奖励 \d+ 铜币)</span>', p.text)
-            total = p.html.find('table.data tr:nth-of-type(2) td:nth-of-type(4)', first=True)
-            sign_msg, today = (sign_msg, today[0] + '\n') if today else \
-                              (f"<b><span style='color: red'>签到失败</span></b>", '')
+            res = f"{msg}<b><span style='color: green'>今天已经签到过了</span></b>"
+            if '领取 X 铜币' in sign_button.get_attribute('value'):
+                sign_button.click()
+                res = f"{msg}<b><span style='color: green'>签到成功</span></b>"
 
-            return (f'---- {username.text} V2EX 签到状态 ----\n{sign_msg}\n'
-                    f"{datas[0]}\n{today}当前账户余额：{total.text} 铜币")
+            money_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "input[value='查看我的账户余额']"))
+            )
+            cell = re.findall(r'>(已连续登录.*?天)<', driver.page_source)[0]
+            money_button.click()
 
-        except Exception:
-            import traceback
-            return f"<b><span style='color: red'>未知异常：</span></b>\n{traceback.format_exc()}"
+            formatted_date = datetime.now().strftime('%Y%m%d')
+            gray = re.findall(f'{formatted_date}.*?(每日登录奖励.*?)</span>', driver.page_source)
+            money = driver.find_element(By.CSS_SELECTOR, "#money .balance_area").text.replace('\n', '').strip()
+            res += f"\n{cell}\n{gray[0]}\n当前账户余额：{money} 铜币"
+
+        except TimeoutException as e:
+            res = f"{msg}<b><span style='color: red'>超时异常：</span></b>\n{e}"
+        except NoSuchElementException as e:
+            res = f"{msg}<b><span style='color: red'>签到失败：</span></b>\n{e}"
+        except WebDriverException as e:
+            res = f"{msg}<b><span style='color: red'>WebDriver异常：</span></b>\n{e}"
+        except Exception as e:
+            res = f"{msg}<b><span style='color: red'>未知异常：</span></b>\n{e}"
+
+        finally:
+            # driver.get('https://bot.sannysoft.com/')
+            # total_height = driver.execute_script("return document.body.scrollHeight")
+            # driver.set_window_size(1920, total_height)
+            # driver.save_screenshot('/tmp/screenshot.png')
+            driver.quit()
+        return res
 
     def main(self):
         msg_all = ""
         for i, check_item in enumerate(self.check_items, start=1):
-            proxy = check_item.get("proxy", "")
             cookie = check_item.get("cookie")
-            msg_all += f'{self.sign(cookie, proxy, i)}\n\n'
+            msg = self.sign(cookie, i)
+            msg_all += msg + "\n\n"
         return msg_all
 
 if __name__ == "__main__":

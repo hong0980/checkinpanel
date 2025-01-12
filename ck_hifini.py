@@ -15,8 +15,15 @@ class HiFiNi:
 
     @staticmethod
     def sign(cookies, i):
-        day, s, headers, url, message = '', HTMLSession(), {'cookie': cookies}, \
-        "https://www.hifini.com/sg_sign.htm", "<b><span style='color: red'>签到失败/span></b>"
+        day, s, headers, url, message = '', HTMLSession(), {
+            'cookie': cookies,
+            "pragma": "no-cache",
+            "cache-control": "no-cache",
+            'authority': 'www.hifini.com',
+            "accept": "application/json, text/javascript, */*; q=0.01",
+            'referer': 'https://www.hifini.com/',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
+        }, "https://www.hifini.com/sg_sign.htm", "<b><span style='color: red'>签到失败/span></b>"
         r = s.get(url, headers=headers)
         name = r.html.find('li.username', first=True)
         if name is None:
