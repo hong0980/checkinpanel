@@ -43,7 +43,7 @@ class V2ex:
             renderer="Intel Iris OpenGL Engine",
         )
 
-        res = ''
+        res, msg = '', ''
         try:
             driver.get('https://www.v2ex.com/signin')
             for single_cookie in cookie.split('; '):

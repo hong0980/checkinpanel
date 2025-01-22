@@ -15,26 +15,25 @@ class Enshan:
 
     @staticmethod
     def sign(cookie, i):
-        url, headers, session, current_date = 'https://www.right.com.cn/forum/home.php', \
-        {"Cookie": cookie}, HTMLSession(), datetime.datetime.now().strftime("%Y-%m-%d")
+        url, headers, session = 'https://www.right.com.cn/forum/home.php', \
+        {"Cookie": cookie,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
+        'Referer': 'https://www.right.com.cn/forum/forum.php',
+        }, HTMLSession()
         try:
-            params = {'mod': 'spacecp', 'ac': 'credit', 'showcredit': '1'}
-            r = session.get(url, headers=headers, params=params)
+            r = session.get(url, headers=headers)
             name = re.findall(r'访问我的空间">(.*?)</a>', r.text)
             name = name[0] if name else None
             if name is None:
                 return (f"<b><span style='color: red'>签到失败</span></b>\n"
                         f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-            params = {'mod': 'spacecp', 'ac': 'credit'}
-            r = session.get(url, headers=headers, params=params)
-            today = re.search(rf'<td>{current_date}.*?</td>', r.text)
-            color, status = ('green', '成功') if today else ('red', '失败')
-            matches = re.findall(r'(恩山币|积分|贡献):\s*</em>(\d+)', r.text)
-            points = ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
+            r = session.get(url, headers=headers)
+            points = re.findall(r'tip="(.*?)">', r.text)
+            color, status = ('green', '成功') if points else ('red', '失败')
             return (f'---- {name} 恩山论坛 签到结果 ----\n'
                     f"<b><span style='color: {color}'>签到{status}</span></b>\n\n"
-                    f'<b>账户信息</b>\n{points}')
+                    f'<b>账户信息</b>\n{points[0]}')
 
         except Exception:
             import traceback
