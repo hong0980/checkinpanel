@@ -56,20 +56,20 @@ class Get:
                 Movieslist = soup.select('tr.thirtypercentdown_bg')
                 for sequence, Moviesinfo in enumerate(Movieslist[:int(Movies_quantity)], start=1):
                     category = Moviesinfo.img.get('title')
-                    Limited_time = Moviesinfo.select_one('span').text
-                    upload_time = Moviesinfo.select_one('span')['title']
+                    Limited_time = Moviesinfo.find('span').text
+                    upload_time = Moviesinfo.find('span')['title']
                     td_tags = Moviesinfo.select('td.rowfollow')
                     data = [td.get_text(strip=True) for td in td_tags]
                     time, size, seeders, leechers, snatched = data[3:8]
-                    movie_name = Moviesinfo.select_one('a[title]')['title']
-                    imdb_img = Moviesinfo.select_one('img[src="pic/imdb.gif"]')
+                    movie_name = Moviesinfo.find('a', title=True)['title']
+                    imdb_img = Moviesinfo.find('img', src="pic/imdb.gif")
                     imdb_rating = imdb_img.find_next_sibling(string=True).strip() if imdb_img else ''
                     chinese_name = ' '.join(Moviesinfo.find('font', class_='subtitle').stripped_strings)
 
                     movie_link = Moviesinfo.select('td.embedded a')[2]['href']
                     d = s.get('https://ptchdbits.co/' + movie_link, headers=headers)
                     movie = BeautifulSoup(d.text, "html.parser")
-                    content = movie.select_one('div#kdescr')
+                    content = movie.find('div', id='kdescr')
                     for tag in content.select('fieldset, div.codetop, div.codemain, span'):
                         tag.decompose()
                     lines = content.get_text(separator='\n', strip=False).splitlines()

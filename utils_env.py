@@ -1,101 +1,72 @@
 # -*- coding: utf-8 -*-
-
 import os
 import platform
 
-# 缓存全局的环境
-ENV = ""
-
+ENV = ""  # 全局环境缓存
 
 def get_env_str() -> str:
-    """
-    尝试获取当前系统的环境，返回字符。
-
-    :return: Windows / Linux / Darwin / github / v2p / ql_new / ql /空
-    """
+    """检测运行环境并返回环境标识字符串"""
     global ENV
     if ENV:
         return ENV
+    
+    # 定义环境检测规则（路径，环境名称）
+    ENV_RULES = [
+        (lambda: os.getenv("GITHUB_ACTIONS"), "github"),
+        ("/usr/local/app/script/Lists/task.list", "v2p"),
+        ("/ql/data/config/token.json", "ql_new"),
+        ("/ql/config/env.sh", "ql")
+    ]
+    
+    # print("正在检测运行环境...")
+    for rule in ENV_RULES:
+        if isinstance(rule[0], str):
+            check = os.path.exists(rule[0])
+        else:
+            check = rule[0]()
+        
+        if check:
+            # print(f"当前环境为: {rule[1]} 环境")
+            ENV = rule[1]
+            break
+    else:  # 未匹配到任何面板环境时检测系统
+        system = platform.system()
+        if system in {"Windows", "Linux", "Darwin"}:
+            # print(f"当前系统环境: {system}")
+            ENV = system
+        else:
+            # print("环境检测失败")
+            ENV = ""
 
-    v2p_file = "/usr/local/app/script/Lists/task.list"
-    ql_new_file = "/ql/data/config/token.json"
-    ql_file = "/ql/config/env.sh"
-
-   # print("尝试检查运行环境...")
-    if os.getenv("GITHUB_ACTIONS"):
-        # print("当前环境为: github action 面板。")
-        env = "github"
-    elif os.path.exists(v2p_file):
-        # print("当前环境为: elecV2P 面板。")
-        env = "v2p"
-    elif os.path.exists(ql_new_file):
-        # print("当前环境为: 青龙面板(v2.12.0+)。")
-        env = "ql_new"
-    elif os.path.exists(ql_file):
-        # print("当前环境为: 青龙面板。")
-        env = "ql"
-
-    # 面板判断优先于系统判断
-    elif (e := platform.system()) == "Windows" or "Linux" or "Darwin":
-        print(f"当前环境为 {e}。")
-        env = e
-    else:
-        print("失败！请检查环境。")
-        env = ""
-
-    ENV = env
-    # print("环境检查结束。\n")
-    return env
-
+    # print("环境检测完成\n")
+    return ENV
 
 def get_env_int() -> int:
-    """
-    尝试获取当前系统的环境，返回数字。
-
-    :return: 空: -1 / Windows: 0 / Linux: 1 / Darwin: 2 / github: 3 / v2p: 4 / ql_new: 5 / ql: 6
-    """
-    env = get_env_str()
-    if env == "Windows":
-        return 0
-    if env == "Linux":
-        return 1
-    if env == "Darwin":
-        return 2
-    if env == "github":
-        return 3
-    if env == "v2p":
-        return 4
-    if env == "ql_new":
-        return 5
-    return 6 if env == "ql" else -1
-
+    """返回环境对应的数字标识"""
+    env_map = {
+        "Windows": 0, "Linux": 1, "Darwin": 2,
+        "github": 3, "v2p": 4, "ql_new": 5, "ql": 6
+    }
+    return env_map.get(get_env_str(), -1)
 
 def get_file_path(file_name: str) -> str:
-    """
-    根据文件名返回对应环境中位置。
-
-    :param file_name: 文件名，不含任何 "/" (即目录)
-    :return: 如果有面板，返回面板默认配置文件夹，否则返回当前目录下文件。 <br/> 如果路径下文件不存在，返回空串。
-    """
-    env_i = get_env_int()
-    # print(f"配置文件 ({file_name}) 检查开始...")
-    paths = [
-        file_name,
-        file_name,
-        file_name,
-        file_name,
-        f"/usr/local/app/script/Lists/{file_name}",
-        f"/ql/data/config/{file_name}",
-        f"/ql/config/{file_name}",
-    ]
-
-    if env_i < 0:
-        print("无法判断环境，选择当前目录为配置文件夹目录。")
-        env_i = 0
-    if not os.path.exists(paths[env_i]):
-        # print(f"未找到配置文件（不一定是错误），路径为: {paths[env_i]}。")
-        # print("配置文件检查结束。\n")
+    """获取指定文件在对应环境中的路径"""
+    env = get_env_str()
+    # print(f"正在检查配置文件: {file_name}...")
+    
+    # 定义环境路径映射
+    path_templates = {
+        "v2p": "/usr/local/app/script/Lists/{}",
+        "ql_new": "/ql/data/config/{}",
+        "ql": "/ql/config/{}"
+    }
+    
+    # 生成完整路径
+    full_path = path_templates.get(env, "{}").format(file_name)
+    
+    if not os.path.exists(full_path):
+        # print(f"配置文件未找到（可能正常）: {full_path}")
         return ""
-    # print(f"在 {paths[env_i]} 发现配置文件。\n")
-    # print("配置文件检查结束。\n")
-    return paths[env_i]
+    
+    # print(f"已找到配置文件: {full_path}\n")
+    return full_path

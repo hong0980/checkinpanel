@@ -14,7 +14,7 @@ checkinpanel_master=${checkinpanel_master##*/}
 
 pl_mods="File::Slurp JSON5 TOML::Dumper"
 js_pkgs="@iarna/toml axios cron-parser crypto-js got"
-alpine_pkgs="libffi-dev make openssl-dev perl-app-cpanminus perl-dev py3-pip"
+alpine_pkgs="libffi-dev openssl-dev perl-app-cpanminus perl-dev py3-pip"
 py_reqs="cryptography dateparser feedparser peewee pytest requests_html schedule tomli lxml_html_clean"
 
 install() {

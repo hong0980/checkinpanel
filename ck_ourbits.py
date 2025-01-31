@@ -3,121 +3,173 @@
 cron: 3 0 * * *
 new Env('ourbits');
 """
-from time import sleep
+import random
+import time
+import traceback
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium_stealth import stealth
 from utils import get_data
-from notify_mtr import send
-import logging
 
-# 设置日志记录器
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
-
-class Get:
+class EnhancedCloudflareBypass:
     def __init__(self, check_items):
         self.check_items = check_items
+        self.max_retries = 3  # 最大重试次数
+        self.chrome_version = "124.0.6367.78"  # 与实际安装版本一致
 
-    @staticmethod
-    def sign(cookie):
-        import traceback
-        from selenium import webdriver
-        from selenium_stealth import stealth
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementNotInteractableException, WebDriverException
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.webdriver.common.action_chains import ActionChains
-
+    def _create_optimized_driver(self):
+        """创建优化稳定性的浏览器实例"""
         options = webdriver.ChromeOptions()
-        options.add_argument('--headless')
-        options.add_argument('--no-sandbox')
-        options.add_argument("start-maximized")
-        options.add_argument("--enable-javascript")
+        
+        # 内存优化配置
+        options.add_argument('--headless=new')
         options.add_argument('--disable-dev-shm-usage')
-        options.add_experimental_option('useAutomationExtension', False)
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--single-process')  # 单进程模式
+        
+        # 屏蔽非必要功能
+        options.add_argument('--disable-images')
+        options.add_argument('--disable-extensions')
+        options.add_argument('--disable-logging')
+        options.add_argument('--disable-notifications')
+        
+        # 版本伪装
+        options.add_argument(f'--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{self.chrome_version} Safari/537.36')
+        
+        # 实验性参数
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option("useAutomationExtension", False)
+        options.add_experimental_option("detach", True)
 
         service = webdriver.ChromeService(
-            log_output='/tmp/ourbits_service.log',
             executable_path='/usr/bin/chromedriver',
-            service_args=['--readable-timestamp']
+            service_args=[
+                '--verbose',
+                f'--chrome-version={self.chrome_version}',  # 版本匹配
+                '--log-path=/tmp/chromedriver.log'
+            ]
         )
 
         driver = webdriver.Chrome(service=service, options=options)
+        
+        # 增强型stealth配置
         stealth(driver,
             platform="Win32",
             fix_hairline=True,
             vendor="Google Inc.",
-            languages=["zh-CN", "zh"],
             webgl_vendor="Intel Inc.",
             renderer="Intel Iris OpenGL Engine",
+            languages=["zh-CN", "zh"],
+            mock_hardware=True,
+            run_on_insecure_origins=True,
+            hide_webdriver=True  # 强化webdriver隐藏
         )
+        return driver
 
+    def _safe_navigate(self, driver, url):
+        """带异常处理的智能导航"""
+        attempt = 0
+        while attempt < self.max_retries:
+            try:
+                driver.get(url)
+                WebDriverWait(driver, 15).until(
+                    lambda d: d.execute_script('return document.readyState') == 'complete'
+                )
+                return True
+            except WebDriverException as e:
+                print(f"导航异常 [{attempt+1}/{self.max_retries}]: {str(e)}")
+                self._recover_session(driver)
+                attempt += 1
+        return False
+
+    def _recover_session(self, driver):
+        """会话恢复机制"""
         try:
-            res = ""
-            url = 'https://ourbits.club/torrents.php'
-            daily_url = 'https://ourbits.club/attendance.php'
-            driver.get(url)
-
-            for single_cookie in cookie.split('; '):
-                name, value = single_cookie.split('=', 1)
-                driver.add_cookie({'name': name, 'value': value})
-            sleep(2)
-            driver.get(url)
-
-            if "欢迎回来" in driver.page_source:
-                if '签到得魔力' in driver.page_source:
-                    try:
-                        driver.find_element(By.CSS_SELECTOR, '#info_block .faqlink').click()
-                        # driver.get(daily_url)
-                        # 每隔一秒保存截图和网页源代码
-                        for i in range(5):
-                            screenshot_name = f'/tmp/图片_Pojie_{i}.png'
-                            source_code_name = f'/tmp/Pojie_{i}.html.txt'
-                            driver.save_screenshot(screenshot_name)
-                            with open(source_code_name, 'w', encoding='utf-8') as f:
-                                f.write(driver.page_source)
-                            sleep(1)
-                        WebDriverWait(driver, 300).until(
-                            EC.presence_of_element_located((By.CLASS_NAME, 'cf-turnstile'))
-                        )
-                    except TimeoutException as e:
-                        logger.error("等待元素出现超时：", exc_info=True)
-                        # 处理超时异常的代码
-                    except ElementNotInteractableException as e:
-                        logger.error("元素不可交互：", exc_info=True)
-                        # 处理元素不可交互异常的代码
-                    except NoSuchElementException as e:
-                        logger.error("未找到元素：", exc_info=True)
-                        # 处理未找到元素异常的代码
-                    except Exception as e:
-                        logger.error("发生其他异常：", exc_info=True)
-                elif "抱歉" in driver.page_source:
-                    res += message
-            else:
-                res += 'cookie 失效'
-            return res
-
-        finally:
-            # driver.get('https://bot.sannysoft.com/')
-            # total_height = driver.execute_script("return document.body.scrollHeight")
-            # driver.set_window_size(1920, total_height)
-            # driver.save_screenshot('/tmp/sannysoft.png')
             driver.quit()
+        except:
+            pass
+        return self._create_optimized_driver()
 
-        return res
+    def _solve_cloudflare(self, driver):
+        """多阶段验证解决方案"""
+        try:
+            # 切换到验证框架
+            WebDriverWait(driver, 20).until(
+                EC.frame_to_be_available_and_switch_to_it(
+                    (By.CSS_SELECTOR, "iframe[title*='Cloudflare']")
+                )
+            )
+            
+            # 执行验证点击
+            checkbox = WebDriverWait(driver, 25).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "label.radio"))
+            )
+            checkbox.click()
+            
+            # 等待验证完成
+            WebDriverWait(driver, 30).until(
+                EC.invisibility_of_element_located((By.ID, "challenge-form"))
+            )
+            driver.switch_to.default_content()
+            return True
+        except Exception as e:
+            print(f"验证失败: {str(e)}")
+            return False
+
+    def sign(self, cookie):
+        driver = None
+        try:
+            driver = self._create_optimized_driver()
+            
+            # 初始化会话
+            if not self._safe_navigate(driver, "https://ourbits.club/login.php"):
+                return "初始化失败"
+                
+            # 注入Cookie
+            for c in cookie.split('; '):
+                name, value = c.strip().split('=', 1)
+                driver.add_cookie({'name': name, 'value': value})
+                
+            # 访问目标页面并处理验证
+            for url in ["https://ourbits.club/torrents.php", 
+                       "https://ourbits.club/attendance.php"]:
+                if not self._safe_navigate(driver, url):
+                    return "导航中断"
+                if not self._solve_cloudflare(driver):
+                    return "Cloudflare验证失败"
+                time.sleep(random.uniform(2,4))
+            
+            # 执行签到操作
+            driver.find_element(By.CSS_SELECTOR, "#signed").click()
+            WebDriverWait(driver, 10).until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, ".signed-success"))
+            )
+            return "签到成功"
+            
+        except Exception as e:
+            traceback.print_exc()
+            return f"异常: {str(e)}"
+        finally:
+            if driver:
+                try:
+                    driver.quit()
+                except:
+                    pass
 
     def main(self):
-        msg_all = ""
-        for i, check_item in enumerate(self.check_items, start=1):
-            cookie = check_item.get("cookie")
-            msg = f"---- 账号({i})ourbits签到结果 ----\n{self.sign(cookie)}"
-            msg_all += msg + "\n\n"
-
-        return msg_all
+        results = []
+        for index, item in enumerate(self.check_items, 1):
+            print(f"正在处理账号 {index}")
+            result = self.sign(item.get("cookie"))
+            results.append(f"账号{index}: {result}")
+            time.sleep(random.randint(5,10))  # 请求间隔防检测
+        return "\n".join(results)
 
 if __name__ == "__main__":
-    _data = get_data()
-    _check_items = _data.get("OURBITS", [])
-    result = Get(check_items=_check_items).main()
-    # send("ourbits", result)
-    print(result)
+    data = get_data()
+    check_items = data.get("OURBITS", [])
+    bot = EnhancedCloudflareBypass(check_items)
+    print(bot.main())
