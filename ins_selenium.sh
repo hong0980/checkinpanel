@@ -9,7 +9,7 @@ COMMENT
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 py_reqs="pytesseract selenium-stealth PyVirtualDisplay undetected-chromedriver"
-alpine_pkgs="build-base tesseract-ocr-data-eng chromium chromium-chromedriver libexif eudev xvfb"
+alpine_pkgs="tesseract-ocr-data-eng chromium-chromedriver libexif eudev xvfb"
 
 install() {
     local count=0 flag=$1
