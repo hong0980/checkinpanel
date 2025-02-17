@@ -101,7 +101,7 @@ class Get:
 if __name__ == "__main__":
     result = Get(check_items=get_data().get("CHDBITS", [])).main()
     if not 'Cookie失效' in result:
-        chunk_size, chunks = 4, []
+        chunk_size, chunks = 3, []
         paragraphs = result.split("\n\n")
         chunks.append(paragraphs[:chunk_size + 1])
         remaining = paragraphs[chunk_size + 1:]
@@ -111,5 +111,5 @@ if __name__ == "__main__":
             chunk_text = "\n\n".join(chunk)
             if chunk_text.strip():
                 send(f"({idx}) chdbits 最新电影信息", chunk_text)
-                time.sleep(4)
+                time.sleep(6)
     # print(result)

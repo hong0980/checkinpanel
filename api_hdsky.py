@@ -16,6 +16,7 @@ class Get:
 
     def sign(self, cookie, Movies_quantity):
         res = ""
+        # session = HTMLSession(executablePath='/usr/bin/chromium')
         session = HTMLSession()
         try:
             url = 'https://hdsky.me/'
