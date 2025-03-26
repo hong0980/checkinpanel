@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 25 2 1,20 * * *
+cron: 25 2 0,12 * * *
 new Env('HDSky 签到');
 """
 

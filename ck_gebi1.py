@@ -78,5 +78,8 @@ if __name__ == "__main__":
     _data = get_data()
     _check_items = _data.get("GEBI1", [])
     result = gebi1(check_items=_check_items).main()
-    send("隔壁网 签到", result)
     # print(result)
+    if '签到成功' in result:
+        send("隔壁网 签到", result)
+    else:
+        print(result)
