@@ -25,7 +25,7 @@ class NicePT:
 
         r = s.get(f'https://www.nicept.net/torrents.php', headers=headers)
         if r.status_code == 200:
-            name = re.findall(r'<b>(.*?)</b>', r.text)
+            name = re.findall(r"class='NexusMaster_Name'><b>(.*?)</b>", r.text)
             name = name[0] if name else None
             if name is None:
                 return (f"<b><span style='color: red'>签到失败</span></b>\n"
