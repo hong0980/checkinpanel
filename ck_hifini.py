@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-cron: 0 0 0,9 * * *
+cron: 45 58 15,23 * * *
 new Env('HiFiNi 签到');
 """
 
 import re
 from utils import get_data
 from notify_mtr import send
+from datetime import datetime, timedelta
 from requests_html import HTMLSession
 
 class HiFiNi:
@@ -15,7 +16,8 @@ class HiFiNi:
 
     @staticmethod
     def sign(cookies, i):
-        day, s, headers, url, message = '', HTMLSession(), {
+        now, day, s, url, message = datetime.now(), '', HTMLSession(), "https://www.hifini.com/sg_sign.htm", "<b><span style='color: red'>签到失败/span></b>"
+        headers = {
             'cookie': cookies,
             "pragma": "no-cache",
             "cache-control": "no-cache",
@@ -23,12 +25,19 @@ class HiFiNi:
             "accept": "application/json, text/javascript, */*; q=0.01",
             'referer': 'https://www.hifini.com/',
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
-        }, "https://www.hifini.com/sg_sign.htm", "<b><span style='color: red'>签到失败/span></b>"
+        }
+
         r = s.get(url, headers=headers)
         name = r.html.find('li.username', first=True)
         if name is None:
             return (f"<b><span style='color: red'>签到失败</span></b>\n"
                     f"账号({i})无法登录！可能Cookie失效，请重新修改")
+
+        if now.hour == 23 and 57 <= now.minute <= 59:
+            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+            sleep_seconds = (midnight - now).total_seconds()
+            print(f'等待{int(sleep_seconds)}秒后执行签到！')
+            time.sleep(sleep_seconds)
 
         sign = re.findall(r'sign = "(\w+)"', r.text)
         headers.update({'X-Requested-With': 'XMLHttpRequest'})

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 55 59 11,23 * * *
+cron: 45 58 11,23 * * *
 new Env('CHDBits 签到');
 """
 
@@ -38,13 +38,13 @@ class Get:
         session, current_time, valid_values = HTMLSession(), datetime.now(), ('1', '2', '4', '8')
         base_url = 'https://ptchdbits.co/bakatest.php'
         session.headers.update({
-            'authority': 'ptchdbits.co', 'Cookie': cookie,
-            'origin': 'https://ptchdbits.co', 'referer': base_url
+            'Cookie': cookie, 'Referer': 'https://ptchdbits.co/torrents.php',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
         })
 
         if current_time.hour == 23 and 57 <= current_time.minute <= 59:
             midnight = current_time.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-            wait_seconds = (midnight - current_time).total_seconds() + 45
+            wait_seconds = (midnight - current_time).total_seconds()
             print(f'等待{int(wait_seconds)}秒后执行签到！')
             time.sleep(wait_seconds)
 
@@ -65,6 +65,7 @@ class Get:
                     'usercomment': '此刻心情:无', 'submit': action_button,
                 }
                 current_time_of_day = datetime.now().time()
+                session.headers.update({'Referer': 'https://ptchdbits.co/bakatest.php'})
                 post_response = session.post(base_url, data=form_data)
                 question_info = re.findall(r'](\[.选\])\s*?请问：(.*?)</td>', response.text)[0]
                 question_table = response.html.find('table[border="1"]', first=True)
