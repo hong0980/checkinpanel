@@ -4,7 +4,7 @@ cron: 45 58 15,23 * * *
 new Env('HiFiNi 签到');
 """
 
-import re
+import re, time
 from utils import get_data
 from notify_mtr import send
 from datetime import datetime, timedelta
@@ -16,14 +16,16 @@ class HiFiNi:
 
     @staticmethod
     def sign(cookies, i):
-        now, day, s, url, message = datetime.now(), '', HTMLSession(), "https://www.hifini.com/sg_sign.htm", "<b><span style='color: red'>签到失败/span></b>"
+        day, now, s = '', datetime.now(), HTMLSession()
+        url = "https://www.hifini.com/sg_sign.htm"
+        message = "<b><span style='color: red'>签到失败/span></b>"
         headers = {
             'cookie': cookies,
             "pragma": "no-cache",
             "cache-control": "no-cache",
             'authority': 'www.hifini.com',
-            "accept": "application/json, text/javascript, */*; q=0.01",
             'referer': 'https://www.hifini.com/',
+            "accept": "application/json, text/javascript, */*; q=0.01",
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
         }
 

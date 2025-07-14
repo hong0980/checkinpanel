@@ -25,29 +25,20 @@ class HDSky:
             return imagehash, img_response
 
         def binarize_image(img_response, threshold=100):
-            # def crop_center(img, width, height):
-            #     img_width, img_height = img.size
-            #     left = (img_width - width) // 2
-            #     top = (img_height - height) // 2
-            #     right = left + width
-            #     bottom = top + height
-            #     return img.crop((left, top, right, bottom))
-
             img = Image.open(BytesIO(img_response.content)).convert('L')
             img = img.resize((img.width * 2, img.height * 2), Image.LANCZOS) # 使用LANCZOS插值算法进行放大
             img = img.crop((45, 25, 252, 55)) # 截取图片
-            # img = crop_center(img, 210, 30) # 截取图片
             img = ImageEnhance.Contrast(img).enhance(0.9) # 对比度设置
             img = img.filter(ImageFilter.MedianFilter(size=3)) # 减少图像中的噪声
             t = [0 if i < threshold else 1 for i in range(256)]
             return img.point(t, '1')
 
         def recognize_captcha_text(img_response):
-            img = binarize_image(img_response, 100)
-            custom_config = r'--oem 3 --psm 6' # oem 0-4 psm 0-13
-            imagestring = pytesseract.image_to_string(img, lang='eng', config=custom_config)
-            imagestring = re.sub(r'[\W_]', '', imagestring)
-            return imagestring if len(imagestring) == 6 else None
+            img = binarize_image(img_response, threshold=130)  # 阈值可调（100-150）
+            custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+            text = pytesseract.image_to_string(img, config=custom_config)
+            text = re.sub(r'[^A-Z0-9]', '', text)[:6]
+            return text if len(text) == 6 else None
 
         msg, count, max_count, s, cg_msg, url, headers = '', 0, 5, HTMLSession(), \
             '你今天已经签到了，请勿重复签到', 'https://hdsky.me/torrents.php', {
@@ -78,7 +69,7 @@ class HDSky:
 
                                 if success == True:
                                     msg = "<b><span style='color: green'>签到成功</span></b>\n"
-                                    cg_msg = (f"已连续签到 {int((message - 10) / 2 + 1)} 天，"
+                                    cg_msg = (f"执行 {count + 1} 次\n已连续签到 {int((message - 10) / 2 + 1)} 天，"
                                               f"奖励 {message} 魔力值，明日继续签到可获得 {message + 2} 魔力值")
                                     r = s.get(url, headers=headers)
                                     break

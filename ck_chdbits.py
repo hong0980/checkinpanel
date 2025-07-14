@@ -44,7 +44,7 @@ class Get:
 
         if current_time.hour == 23 and 57 <= current_time.minute <= 59:
             midnight = current_time.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-            wait_seconds = (midnight - current_time).total_seconds()
+            wait_seconds = (midnight - current_time).total_seconds() + 35
             print(f'等待{int(wait_seconds)}秒后执行签到！')
             time.sleep(wait_seconds)
 
@@ -62,7 +62,7 @@ class Get:
                 action_button = '不会' if wait_seconds else '提交'
                 form_data = {
                     'questionid': question_id, 'choice[]': selected_answers,
-                    'usercomment': '此刻心情:无', 'submit': action_button,
+                    'usercomment': '此刻心情:无', 'submit': '不会',
                 }
                 current_time_of_day = datetime.now().time()
                 session.headers.update({'Referer': 'https://ptchdbits.co/bakatest.php'})
