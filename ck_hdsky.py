@@ -34,10 +34,10 @@ class HDSky:
             return img.point(t, '1')
 
         def recognize_captcha_text(img_response):
-            img = binarize_image(img_response, threshold=130)  # 阈值可调（100-150）
-            custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-            text = pytesseract.image_to_string(img, config=custom_config)
-            text = re.sub(r'[^A-Z0-9]', '', text)[:6]
+            img = binarize_image(img_response, 100)
+            custom_config = r'--oem 3 --psm 6' # oem 0-4 psm 0-13
+            text = pytesseract.image_to_string(img, lang='eng', config=custom_config)
+            text = re.sub(r'[^A-Z0-9]', '', text)
             return text if len(text) == 6 else None
 
         msg, count, max_count, s, cg_msg, url, headers = '', 0, 5, HTMLSession(), \

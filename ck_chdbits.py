@@ -38,13 +38,13 @@ class Get:
         session, current_time, valid_values = HTMLSession(), datetime.now(), ('1', '2', '4', '8')
         base_url = 'https://ptchdbits.co/bakatest.php'
         session.headers.update({
-            'Cookie': cookie, 'Referer': 'https://ptchdbits.co/torrents.php',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
+            'Cookie': cookie, 'referer': base_url,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0'
         })
 
         if current_time.hour == 23 and 57 <= current_time.minute <= 59:
             midnight = current_time.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-            wait_seconds = (midnight - current_time).total_seconds() + 35
+            wait_seconds = (midnight - current_time).total_seconds() + 53
             print(f'等待{int(wait_seconds)}秒后执行签到！')
             time.sleep(wait_seconds)
 
@@ -60,13 +60,13 @@ class Get:
                     selected_answers = generate_answer(response.text, selected_answers)
 
                 action_button = '不会' if wait_seconds else '提交'
-                form_data = {
+                data = {
                     'questionid': question_id, 'choice[]': selected_answers,
-                    'usercomment': '此刻心情:无', 'submit': '不会',
+                    'usercomment': '此刻心情:无', 'wantskip': action_button,
                 }
                 current_time_of_day = datetime.now().time()
-                session.headers.update({'Referer': 'https://ptchdbits.co/bakatest.php'})
-                post_response = session.post(base_url, data=form_data)
+                session.headers.update({'origin': 'https://ptchdbits.co', 'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Microsoft Edge";v="138"'})
+                post_response = session.post(base_url, data=data)
                 question_info = re.findall(r'](\[.选\])\s*?请问：(.*?)</td>', response.text)[0]
                 question_table = response.html.find('table[border="1"]', first=True)
                 question_text = question_table.find('td')[1].text.strip()
