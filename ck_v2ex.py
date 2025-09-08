@@ -4,12 +4,13 @@ cron: 10 9,15 * * *
 new Env('V2EX 签到');
 """
 
-import re
+import re, time, random
 from utils import get_data
 from notify_mtr import send
 from datetime import datetime
 from selenium import webdriver
-from selenium_stealth import stealth
+from fake_useragent import UserAgent
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -20,32 +21,47 @@ class V2ex:
         self.check_items = check_items
 
     @staticmethod
-    def sign(cookie, i):
+    def setup_browser():
         options = webdriver.ChromeOptions()
-        options.add_argument('--headless')
-        options.add_argument('--no-sandbox')
-        options.add_argument("start-maximized")
-        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument("--headless=new")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option("useAutomationExtension", False)
 
-        service = webdriver.ChromeService(
-            log_output='/tmp/v2ex.log',
-            executable_path='/usr/bin/chromedriver',
-            service_args=['--readable-timestamp']
+        driver = webdriver.Chrome(
+            options=options,
+            service=Service('/usr/bin/chromedriver')
         )
 
-        driver = webdriver.Chrome(service=service, options=options)
-        stealth(driver,
-            platform="Win32",
-            fix_hairline=True,
-            vendor="Google Inc.",
-            languages=["zh-CN", "zh"],
-            webgl_vendor="Intel Inc.",
-            renderer="Intel Iris OpenGL Engine",
-        )
+        evasions = [
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})",
+            "Object.defineProperty(navigator, 'languages', {get: () => ['zh-CN','zh','en']})",
+            "Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3]})",
+            "Object.defineProperty(navigator, 'platform', {get: () => 'Win32'})",
+        ]
+        for script in evasions:
+            driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": script})
 
+        headers = {
+            "User-Agent": UserAgent().chrome,
+            "Accept-Language": "zh-CN,zh;q=0.9",
+        }
+        try:
+            driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": headers})
+        except Exception:
+            pass
+
+        return driver
+
+    @staticmethod
+    def sign(cookie, i):
         res, msg = '', ''
+        driver = V2ex.setup_browser()
         try:
             driver.get('https://www.v2ex.com/signin')
+
             for single_cookie in cookie.split('; '):
                 name, value = single_cookie.split('=', 1)
                 driver.add_cookie({'name': name, 'value': value})
@@ -63,6 +79,7 @@ class V2ex:
             res = f"{msg}<b><span style='color: green'>今天已经签到过了</span></b>"
             if '领取 X 铜币' in sign_button.get_attribute('value'):
                 sign_button.click()
+                time.sleep(random.uniform(1.0, 2.0))
                 res = f"{msg}<b><span style='color: green'>签到成功</span></b>"
 
             money_button = WebDriverWait(driver, 10).until(
@@ -70,11 +87,16 @@ class V2ex:
             )
             cell = re.findall(r'>(已连续登录.*?天)<', driver.page_source)[0]
             money_button.click()
+            time.sleep(random.uniform(1.0, 2.0))
 
             formatted_date = datetime.now().strftime('%Y%m%d')
             gray = re.findall(f'{formatted_date}.*?(每日登录奖励.*?)</span>', driver.page_source)
             money = driver.find_element(By.CSS_SELECTOR, "#money .balance_area").text.replace('\n', '').strip()
             res += f"\n{cell}\n{gray[0]}\n当前账户余额：{money} 铜币"
+
+            # with open(f"/tmp/v2ex_{i}.html", "w", encoding="utf-8") as f:
+            #     f.write(driver.page_source)
+            # driver.save_screenshot(f"/tmp/v2ex_{i}.png")
 
         except TimeoutException as e:
             res = f"{msg}<b><span style='color: red'>超时异常：</span></b>\n{e}"
@@ -84,12 +106,7 @@ class V2ex:
             res = f"{msg}<b><span style='color: red'>WebDriver异常：</span></b>\n{e}"
         except Exception as e:
             res = f"{msg}<b><span style='color: red'>未知异常：</span></b>\n{e}"
-
         finally:
-            # driver.get('https://bot.sannysoft.com/')
-            # total_height = driver.execute_script("return document.body.scrollHeight")
-            # driver.set_window_size(1920, total_height)
-            # driver.save_screenshot('/tmp/screenshot.png')
             driver.quit()
         return res
 
