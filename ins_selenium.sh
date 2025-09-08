@@ -8,7 +8,7 @@ COMMENT
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-py_reqs="pytesseract selenium-stealth PyVirtualDisplay undetected-chromedriver"
+py_reqs="selenium-stealth pytesseract PyVirtualDisplay undetected-chromedriver"
 alpine_pkgs="freetype-dev ttf-freefont dbus chromium-chromedriver tesseract-ocr-data-eng libexif eudev xvfb"
 
 # 安装函数：自动重试 + 错误退出
