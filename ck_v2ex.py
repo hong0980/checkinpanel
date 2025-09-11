@@ -4,7 +4,7 @@ cron: 10 9,15 * * *
 new Env('V2EX 签到');
 """
 
-import re, time, random
+import re, time, random, shutil, tempfile
 from utils import get_data
 from notify_mtr import send
 from datetime import datetime
@@ -23,6 +23,8 @@ class V2ex:
     @staticmethod
     def setup_browser():
         options = webdriver.ChromeOptions()
+        user_data_dir = tempfile.mkdtemp(prefix="selenium_chrome_")
+        options.add_argument(f"--user-data-dir={user_data_dir}")
         options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
@@ -53,12 +55,12 @@ class V2ex:
         except Exception:
             pass
 
-        return driver
+        return driver, user_data_dir
 
     @staticmethod
     def sign(cookie, i):
         res, msg = '', ''
-        driver = V2ex.setup_browser()
+        driver, user_data_dir = V2ex.setup_browser()
         try:
             driver.get('https://www.v2ex.com/signin')
 
@@ -108,6 +110,7 @@ class V2ex:
             res = f"{msg}<b><span style='color: red'>未知异常：</span></b>\n{e}"
         finally:
             driver.quit()
+            shutil.rmtree(user_data_dir, ignore_errors=True)
         return res
 
     def main(self):

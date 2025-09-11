@@ -5,7 +5,7 @@ new Env('吾爱破解');
 """
 
 from utils import get_data
-import re, time, random
+import re, time, random, shutil, tempfile
 from notify_mtr import send
 from datetime import datetime
 from selenium import webdriver
@@ -23,7 +23,9 @@ class Pojie:
     @staticmethod
     def setup_browser():
         options = webdriver.ChromeOptions()
-        options.add_argument("--headless=new")
+        user_data_dir = tempfile.mkdtemp(prefix="selenium_chrome_")
+        options.add_argument(f"--user-data-dir={user_data_dir}")
+        options.add_argument("--headless")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-blink-features=AutomationControlled")
@@ -53,12 +55,12 @@ class Pojie:
         except Exception:
             pass
 
-        return driver
+        return driver, user_data_dir
 
     @staticmethod
     def sign(cookie):
         res, msg = '', ''
-        driver = Pojie.setup_browser()
+        driver, user_data_dir = Pojie.setup_browser()
 
         try:
             driver.get('https://www.52pojie.cn/forum.php')
@@ -68,6 +70,57 @@ class Pojie:
 
             driver.get('https://www.52pojie.cn/forum.php')
             print(driver.page_source)
+
+        #     <p> 已经签到页面
+        #     <a href="home.php?mod=task&amp;do=apply&amp;id=2&amp;referer=%2Fforum.php"><img src="https://static.52pojie.cn/static/image/common/qds.png" class="qq_bind" align="absmiddle" alt=""></a> <span class="pipe">|</span><a href="home.php?mod=spacecp&amp;ac=credit&amp;showcredit=1" id="extcreditmenu" onmouseover="delayShow(this, showCreditmenu);" class="showmenu">积分: 11</a>
+        #     <span class="pipe">|</span><a href="home.php?mod=spacecp&amp;ac=usergroup" id="g_upmine" class="showmenu" onmouseover="delayShow(this, showUpgradeinfo)">用户组: 锋芒初露</a>
+        #     </p>
+
+        #     <p> 没有签到页面
+        #     <a href="javascript:void(0);"><img src="https://www.52pojie.cn/static/image/common/wbs.png" class="qq_bind" align="absmiddle" alt=""></a> <span class="pipe">|</span><a href="home.php?mod=spacecp&amp;ac=credit&amp;showcredit=1" id="extcreditmenu" onmouseover="delayShow(this, showCreditmenu);" class="showmenu">积分: 11</a>
+        #     <span class="pipe">|</span><a href="home.php?mod=spacecp&amp;ac=usergroup" id="g_upmine" class="showmenu" onmouseover="delayShow(this, showUpgradeinfo)">用户组: 锋芒初露</a>
+        #     </p>
+
+        #     # 等待页面加载完成，确保 #um 存在
+        #     WebDriverWait(driver, 10).until(
+        #         EC.presence_of_element_located((By.ID, "um"))
+        #     )
+
+        #     # 执行签到函数
+        #     driver.execute_script(
+        #         """
+        #         function qianDao() {
+        #             if (location.pathname === '/home.php' && location.search.indexOf('mod=task') > -1) {
+        #                 return;
+        #             }
+        #             let qiandao = document.querySelector('#um a[href^="home.php?mod=task&do=apply&id=2"]');
+        #             if (qiandao) {
+        #                 let iframe = document.createElement('iframe');
+        #                 document.lastElementChild.appendChild(iframe);
+        #                 iframe.style = 'display: none;';
+        #                 iframe.src = qiandao.href;
+        #                 let img = qiandao.querySelector('.qq_bind');
+        #                 if (img) {
+        #                     img.src = 'https://www.52pojie.cn/static/image/common/wbs.png';
+        #                 }
+        #                 qiandao.href = 'javascript:void(0);';
+        #             }
+        #         }
+        #         qianDao();
+        #         """
+        #     )
+        #     time.sleep(3)
+
+        #    # 判断结果
+        #     try:
+        #         driver.find_element(By.XPATH, '//a[@href="javascript:void(0);"]//img[@src[contains(., "wbs.png")]]')
+        #         res = "✅ 签到成功"
+        #     except NoSuchElementException:
+        #         try:
+        #             driver.find_element(By.XPATH, '//img[@src[contains(., "qds.png")]]')
+        #             res = "🟡 签到失败：仍显示签到图标"
+        #         except NoSuchElementException:
+        #             res = "🟢 今日已签到 或 无签到任务"
 
         except TimeoutException as e:
             res = f"{msg}<b><span style='color: red'>超时异常：</span></b>\n{e}"
@@ -79,6 +132,7 @@ class Pojie:
             res = f"{msg}<b><span style='color: red'>未知异常：</span></b>\n{e}"
         finally:
             driver.quit()
+            shutil.rmtree(user_data_dir, ignore_errors=True)
         return res
 
     def main(self):
