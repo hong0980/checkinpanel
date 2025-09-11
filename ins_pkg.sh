@@ -8,12 +8,11 @@ COMMENT
 pl_mods="File::Slurp JSON5 TOML::Dumper"
 alpine_pkgs="py3-pip libffi-dev openssl-dev perl-app-cpanminus perl-dev make"
 py_reqs="cryptography dateparser feedparser peewee requests_html schedule tomli lxml_html_clean"
-js_pkgs="redis@4.7.0 global-agent https-proxy-agent@7.0.5 tunnel png-js date-fns axios@1.7.7 dotenv got@11.8.6 crypto-js sharp fs md5 ts-md5 request jsdom download js-base64 qrcode-terminal moment ws form-data tslib @types/node tough-cookie"
+js_pkgs="@iarna/toml @types/node axios@1.7.7 crypto-js date-fns dotenv download form-data fs global-agent got@11.8.6 https-proxy-agent@7.0.5 js-base64 jsdom md5 moment png-js qrcode-terminal redis@4.7.0 request sharp tough-cookie ts-md5 tslib tunnel ws"
 
 install() {
     local max_retries=3 retry_count=0 cmd="$1" pkg="$2"
     while [ $retry_count -lt $max_retries ]; do
-        echo "....... 开始安装 $pkg ......."
         [[ $retry_count -gt 0 ]] && echo "$pkg (第 $((retry_count + 1)) 次) 尝试安装"
         if eval "$cmd"; then
             echo -e "✅ $pkg 安装成功\n"
@@ -34,6 +33,7 @@ install_alpine_pkgs() {
             echo "ℹ️ $pkg 已安装"
             continue
         fi
+        echo "....... 安装 $pkg ......."
         install "apk add --no-cache --quiet $pkg" "$pkg"
     done
 }
@@ -44,6 +44,7 @@ install_py_reqs() {
             echo "ℹ️ $pkg 已安装"
             continue
         fi
+        echo "....... 安装 $pkg ......."
         install "pip3 install --user -q --force-reinstall --disable-pip-version-check --root-user-action=ignore --use-pep517 $pkg" "$pkg"
     done
     pip3 install --user --root-user-action=ignore --upgrade pip -q >/dev/null 2>&1
@@ -67,6 +68,7 @@ install_js_pkgs() {
             echo "ℹ️ $pkg 已安装"
             continue
         fi
+        echo "....... 安装 $pkg ......."
         install "pnpm add -g --silent $pkg" "$pkg"
     done
     pnpm list -g --depth 0
@@ -84,13 +86,14 @@ install_pl_mods() {
     for i in $pl_mods; do
         if perldoc -l "$i" > /dev/null 2>&1; then
             echo "ℹ️ $i 已安装"
-        else
-            install "cpm install -g --static-install $i" "$i"
+            continue
         fi
+        echo "....... 安装 $pkg ......."
+        install "cpm install -g --static-install $i" "$i"
     done
 }
 
-install_js_pkgs
-install_py_reqs
 install_alpine_pkgs
+install_py_reqs
+install_js_pkgs
 install_pl_mods

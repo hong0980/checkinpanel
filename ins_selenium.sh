@@ -6,16 +6,11 @@ new Env('安装 selenium tesseract);
 COMMENT
 
 py_reqs="selenium-stealth pytesseract PyVirtualDisplay undetected-chromedriver"
-alpine_pkgs="freetype-dev ttf-freefont dbus tesseract-ocr-data-eng libexif eudev xvfb chromium-chromedriver"
+alpine_pkgs="freetype-dev ttf-freefont dbus chromium-chromedriver tesseract-ocr-data-eng libexif eudev xvfb"
 
 install() {
-    local max_retries=3
-    local retry_count=0
-    local cmd="$1"
-    local pkg="$2"
-
+    local max_retries=3 retry_count=0 cmd="$1" pkg="$2"
     while [ $retry_count -lt $max_retries ]; do
-        echo "....... 安装 $pkg ......."
         [[ $retry_count != 0 ]] && echo "$pkg (第 $((retry_count + 1)) 次) 尝试安装"
         if eval "$cmd"; then
             echo -e "✅ $pkg 安装成功\n"
@@ -37,6 +32,7 @@ install_alpine_pkgs() {
             echo "ℹ️ $pkg 已安装"
             continue
         fi
+        echo "....... 安装 $pkg ......."
         install "apk add --no-cache --quiet $pkg" "$pkg"
     done
 }
@@ -47,6 +43,7 @@ install_py_reqs() {
             echo "ℹ️ $pkg 已安装"
             continue
         fi
+        echo "....... 安装 $pkg ......."
         install "pip3 install --user -q --force-reinstall --disable-pip-version-check --root-user-action=ignore $pkg" "$pkg"
     done
 }
