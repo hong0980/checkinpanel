@@ -5,8 +5,10 @@ cron: 1 1 1 1 *
 new Env('安装 selenium tesseract);
 COMMENT
 
-py_reqs="selenium-stealth pytesseract PyVirtualDisplay undetected-chromedriver"
-alpine_pkgs="freetype-dev ttf-freefont dbus chromium-chromedriver tesseract-ocr-data-eng libexif eudev xvfb"
+py_reqs="selenium-stealth pytesseract PyVirtualDisplay undetected-chromedriver psutil"
+alpine_pkgs="freetype-dev ttf-freefont dbus chromium-chromedriver
+tesseract-ocr-data-eng libexif eudev xvfb
+alpine-sdk autoconf automake libtool"
 
 install() {
     local max_retries=3 retry_count=0 cmd="$1" pkg="$2"

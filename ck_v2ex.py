@@ -70,7 +70,8 @@ class V2ex:
             driver.get('https://www.v2ex.com/mission/daily')
 
             if '注册' in driver.page_source:
-                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
+                res = f'账号({i})无法登录！可能Cookie失效，请重新修改'
+                return
 
             sign_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[type="button"]'))
