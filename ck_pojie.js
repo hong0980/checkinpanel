@@ -1,7 +1,6 @@
 /*
- * 29 0-23/8 * * * 52pojie_checkin.js
- * 吾爱破解自动签到脚本
- * 定时任务：每天 0-23 点每 8 小时执行一次，在 29 分钟时执行
+吾爱破解
+cron "3 0,11 * * *" ck_pojie.js
  */
 
 // 导入工具模块
@@ -299,7 +298,7 @@ async function main() {
     }
     $.done;
     // 发送通知（已注释）
-    // notify.sendNotify('吾爱破解', msgAll);
+    notify.sendNotify('吾爱破解', msgAll);
     $.log(msgAll);
 }
 

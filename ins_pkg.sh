@@ -74,6 +74,7 @@ install_node_packages() {
         echo "....... 安装 $pkg ......."
         install "pnpm add -g --silent $pkg" "$pkg"
     done
+    echo -e "\n===== 已经安装 Node.js 包 ====="
     pnpm list -g --depth 0
 }
 

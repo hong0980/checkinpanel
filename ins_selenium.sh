@@ -5,7 +5,7 @@ cron: 1 1 1 1 *
 new Env('安装 selenium puppeteer tesseract);
 COMMENT
 
-js_pkgs="puppeteer-extra-plugin-stealth puppeteer-extra jsutils"
+js_pkgs="puppeteer-extra-plugin-stealth puppeteer-extra puppeteer-core jsutils"
 py_reqs="selenium-stealth pytesseract PyVirtualDisplay undetected-chromedriver psutil"
 alpine_pkgs="freetype-dev ttf-freefont dbus chromium-chromedriver
 tesseract-ocr-data-eng libexif eudev xvfb
@@ -64,6 +64,7 @@ install_node_packages() {
         echo "....... 安装 $pkg ......."
         install "pnpm add -g --silent $pkg" "$pkg"
     done
+    echo -e "\n===== 已经安装 Node.js 包 ====="
     pnpm list -g --depth 0
 }
 
