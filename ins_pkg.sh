@@ -26,11 +26,12 @@ install() {
     return 1
 }
 
-install_alpine_pkgs() {
+install_alpine_packages() {
+    echo -e "\n===== 开始安装 Alpine Linux 软件包 ====="
     apk update >/dev/null 2>&1
     for pkg in $alpine_pkgs; do
         if apk info -e "$pkg" >/dev/null 2>&1; then
-            echo "ℹ️ $pkg 已安装"
+            printf "ℹ️ %-30s 已安装\n" "$pkg"
             continue
         fi
         echo "....... 安装 $pkg ......."
@@ -38,10 +39,11 @@ install_alpine_pkgs() {
     done
 }
 
-install_py_reqs() {
+install_python_packages() {
+    echo -e "\n===== 开始安装 Python 依赖包 ====="
     for pkg in $py_reqs; do
         if pip3 show "$pkg" >/dev/null 2>&1; then
-            echo "ℹ️ $pkg 已安装"
+            printf "ℹ️ %-30s 已安装\n" "$pkg"
             continue
         fi
         echo "....... 安装 $pkg ......."
@@ -60,12 +62,13 @@ install_py_reqs() {
     fi
 }
 
-install_js_pkgs() {
+install_node_packages() {
     command -v pnpm &>/dev/null || install "npm install -g pnpm --silent" "pnpm"
+    echo -e "\n===== 开始安装 Node.js 依赖包 ====="
 
     for pkg in $js_pkgs; do
         if [ -n "$(pnpm list -g $pkg --silent)" ]; then
-            echo "ℹ️ $pkg 已安装"
+            printf "ℹ️ %-30s 已安装\n" "$pkg"
             continue
         fi
         echo "....... 安装 $pkg ......."
@@ -74,7 +77,8 @@ install_js_pkgs() {
     pnpm list -g --depth 0
 }
 
-install_pl_mods() {
+install_perl_modules() {
+    echo -e "\n===== 开始安装 Perl 模块 ====="
     if command -v cpm >/dev/null 2>&1; then
         echo "ℹ️ App::cpm 已安装"
     else
@@ -83,17 +87,17 @@ install_pl_mods() {
             curl -fsSL https://cdn.jsdelivr.net/gh/Oreomeow/checkinpanel/cpm >cpm && chmod +x cpm && ./cpm --version
         fi
     fi
-    for i in $pl_mods; do
-        if perldoc -l "$i" > /dev/null 2>&1; then
-            echo "ℹ️ $i 已安装"
+    for pkg in $pl_mods; do
+        if perldoc -l "$pkg" > /dev/null 2>&1; then
+            printf "ℹ️ %-30s 已安装\n" "$pkg"
             continue
         fi
         echo "....... 安装 $pkg ......."
-        install "cpm install -g --static-install $i" "$i"
+        install "cpm install -g --static-install $pkg" "$pkg"
     done
 }
 
-install_alpine_pkgs
-install_py_reqs
-install_js_pkgs
-install_pl_mods
+install_alpine_packages
+install_python_packages
+install_node_packages
+install_perl_modules

@@ -93,7 +93,7 @@ for (var i in PushConfig) {
 
 // ================================notify.json5 变量再覆盖====================================
 if (getNotifyData()) {
-    console.log('您使用的是自己的通知配置文件。');
+    // console.log('您使用的是自己的通知配置文件。');
     for (var a in PushConfig) {
         PushConfig[a] = getNotifyData()[a];
     }
@@ -124,7 +124,7 @@ if (!PushConfig.TG_API_HOST) {
  */
 async function sendNotify(text, desp, params = {}, author = '\n\nGitHub: https://github.com/Oreomeow/checkinpanel') {
     // 提供 7 种通知
-    desp += author; // 增加作者信息，防止被贩卖等
+    // desp += author; // 增加作者信息，防止被贩卖等
     await Promise.all([
         serverJNotify(text, desp), // server酱微信通知
         pushplusNotify(text, desp), // pushplus(推送加)
@@ -146,9 +146,8 @@ function BarkNotify(text, desp, params = {}) {
     return new Promise((resolve) => {
         if (PushConfig.BARK_PUSH) {
             const options = {
-                url: `${PushConfig.BARK_PUSH}/${encodeURIComponent(text)}/${encodeURIComponent(desp)}?sound=${PushConfig.BARK_SOUND}&group=${
-                    PushConfig.BARK_GROUP
-                }&${querystring.stringify(params)}`,
+                url: `${PushConfig.BARK_PUSH}/${encodeURIComponent(text)}/${encodeURIComponent(desp)}?sound=${PushConfig.BARK_SOUND}&group=${PushConfig.BARK_GROUP
+                    }&${querystring.stringify(params)}`,
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },

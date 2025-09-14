@@ -10,6 +10,7 @@ from notify_mtr import send
 from datetime import datetime
 from selenium import webdriver
 from fake_useragent import UserAgent
+from selenium_stealth import stealth
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -24,27 +25,26 @@ class V2ex:
     def setup_browser():
         options = webdriver.ChromeOptions()
         user_data_dir = tempfile.mkdtemp(prefix="selenium_chrome_")
-        options.add_argument(f"--user-data-dir={user_data_dir}")
-        options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
+        options.add_argument("--headless=new")
         options.add_argument("--disable-dev-shm-usage")
+        options.add_argument(f"--user-data-dir={user_data_dir}")
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option("useAutomationExtension", False)
 
         driver = webdriver.Chrome(
             options=options,
             service=Service('/usr/bin/chromedriver')
         )
-
-        evasions = [
-            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})",
-            "Object.defineProperty(navigator, 'languages', {get: () => ['zh-CN','zh','en']})",
-            "Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3]})",
-            "Object.defineProperty(navigator, 'platform', {get: () => 'Win32'})",
-        ]
-        for script in evasions:
-            driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": script})
+        stealth(driver,
+            platform="Win32",
+            fix_hairline=True,
+            hide_webdriver=True,
+            vendor="Google Inc.",
+            webgl_vendor="Intel Inc.",
+            languages=["zh-CN", "zh"],
+            renderer="Intel Iris OpenGL Engine",
+        )
 
         headers = {
             "User-Agent": UserAgent().chrome,

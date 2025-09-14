@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 cron: 53 11 * * *
 new Env('吾爱破解');
@@ -10,160 +9,143 @@ from notify_mtr import send
 from datetime import datetime
 from selenium import webdriver
 from fake_useragent import UserAgent
+from selenium_stealth import stealth
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException
 
-class Pojie:
-    def __init__(self, check_items):
-        self.check_items = check_items
+def setup_browser():
+    user_data_dir = tempfile.mkdtemp(prefix="selenium_chrome_")
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument(f"--user-data-dir={user_data_dir}")
+    options.add_argument(f"--user-agent={UserAgent().chrome}")
+    options.add_argument("--disable-gpu")  # 新增：解决 GPU 初始化错误
+    options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
 
-    @staticmethod
-    def setup_browser():
-        options = webdriver.ChromeOptions()
-        user_data_dir = tempfile.mkdtemp(prefix="selenium_chrome_")
-        options.add_argument(f"--user-data-dir={user_data_dir}")
-        options.add_argument("--headless")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option("useAutomationExtension", False)
+    service = webdriver.ChromeService()
+    service.executable_path='/usr/bin/chromedriver'
+    service.service_args = [
+        '--verbose',                    # 详细日志
+        '--readable-timestamp',         # 可读时间
+        '--enable-chrome-logs',         # 启用 Chrome 内部日志
+        '--no-sandbox',                 # 容器中常用
+        '--disable-dev-shm-usage',      # 防止内存溢出
+        # '--append-log',               # 如需追加日志
+        '--log-path=/tmp/52pojie.log'
+    ]
 
-        driver = webdriver.Chrome(
-            options=options,
-            service=Service('/usr/bin/chromedriver')
+    driver = webdriver.Chrome(options=options, service=service)
+    stealth(driver,
+        platform="Win32",
+        fix_hairline=True,
+        hide_webdriver=True,
+        vendor="Google Inc.",
+        webgl_vendor="Intel Inc.",
+        languages=["zh-CN", "zh"],
+        renderer="Intel Iris OpenGL Engine",
+    )
+    actions = ActionChains(driver)
+    actions.move_by_offset(random.randint(10, 100), random.randint(10, 100)).perform()
+
+    # 禁用 debugger 语句
+    driver.execute_script("""
+        (function() {
+            window.__proto__.__defineGetter__('debugger', () => {});
+            Object.defineProperty(window, 'debugger', {value: undefined, writable: false});
+            let originalSetInterval = window.setInterval;
+            window.setInterval = function(callback, timeout) {
+                if (typeof callback === 'function' && callback.toString().includes('debugger')) return;
+                if (typeof callback === 'string' && callback.includes('debugger')) return;
+                return originalSetInterval.apply(this, arguments);
+            };
+            let originalSetTimeout = window.setTimeout;
+            window.setTimeout = function(callback, timeout) {
+                if (typeof callback === 'function' && callback.toString().includes('debugger')) return;
+                if (typeof callback === 'string' && callback.includes('debugger')) return;
+                return originalSetTimeout.apply(this, arguments);
+            };
+        })();
+    """)
+
+    return driver, user_data_dir
+
+def sign(cookie, i):
+    msg = ''
+    driver, user_data_dir = setup_browser()
+
+    try:
+        driver.get('https://www.52pojie.cn/forum.php')
+        for single_cookie in cookie.split('; '):
+            name, value = single_cookie.split('=', 1)
+            driver.add_cookie({'name': name, 'value': value})
+        time.sleep(2)
+
+        driver.get('https://www.52pojie.cn/forum.php')
+        # driver.get('https://visit.zjsru.edu.cn/visitor/qrCode?id=fec1f2b23ce1f0bb1a595423af169b79')
+
+
+        if '自动登录' in driver.page_source:
+            return f'❌ 无法登录！可能Cookie失效，请重新修改'
+
+        name_element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, 'strong.vwmy a[href*="uid="]'))
         )
+        um_element = driver.find_element(By.CSS_SELECTOR, '#um p:nth-of-type(2)')
+        msg = f"---- {name_element.text} 吾爱破解 签到状态 ----\n"
+        upmine = driver.find_element(By.ID, "g_upmine").get_attribute("textContent").strip()
+        integral = driver.find_element(By.ID, "extcreditmenu").get_attribute("textContent").strip()
 
-        evasions = [
-            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})",
-            "Object.defineProperty(navigator, 'languages', {get: () => ['zh-CN','zh','en']})",
-            "Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3]})",
-            "Object.defineProperty(navigator, 'platform', {get: () => 'Win32'})",
-        ]
-        for script in evasions:
-            driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": script})
+        if len(driver.find_elements(By.CSS_SELECTOR, 'img.qq_bind[src*="wbs.png"]')) > 0:
+            return f"{msg}<b><span style='color: green'>✅ 今天已经签到过了</span></b>\n{integral} | {upmine}"
 
-        headers = {
-            "User-Agent": UserAgent().chrome,
-            "Accept-Language": "zh-CN,zh;q=0.9",
-        }
         try:
-            driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": headers})
-        except Exception:
+            sign_button = driver.find_element(By.CSS_SELECTOR, 'img.qq_bind[src*="qds.png"]')
+            driver.execute_script("arguments[0].scrollIntoView();arguments[0].click()", sign_button)
+            time.sleep(8)
+            if len(driver.find_elements(By.CSS_SELECTOR, 'img.qq_bind[src*="wbs.png"]')) > 0:
+                return f"{msg}✅ 签到成功\n{integral} | {upmine}"
+        except NoSuchElementException:
+            return f"{msg}\n❌ 签到失败"
+
+    except TimeoutException as e:
+        return f"{msg}<b><span style='color: red'>超时异常：</span></b>\n{e}"
+    except NoSuchElementException as e:
+        return f"{msg}<b><span style='color: red'>签到失败：</span></b>\n{e}"
+    except WebDriverException as e:
+        return f"{msg}<b><span style='color: red'>WebDriver异常：</span></b>\n{e}"
+    except Exception as e:
+        return f"{msg}<b><span style='color: red'>未知异常：</span></b>\n{e}"
+    finally:
+        try:
+            with open(f"/tmp/52pojie_{i}.html", "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            driver.save_screenshot(f"/tmp/52pojie_{i}.png")
+        except:
             pass
+        driver.quit()
+        shutil.rmtree(user_data_dir, ignore_errors=True)
 
-        return driver, user_data_dir
+def main():
+    _data = get_data()
+    check_items = _data.get("POJIE", [])
 
-    @staticmethod
-    def sign(cookie):
-        res, msg = '', ''
-        driver, user_data_dir = Pojie.setup_browser()
+    msg_all = ""
+    for i, check_item in enumerate(check_items, start=1):
+        cookie = check_item.get("cookie")
+        sign_msg = sign(cookie, i)
+        msg = f"账号 {i} 签到状态: {sign_msg}"
+        msg_all += msg + "\n\n"
 
-        try:
-            driver.get('https://www.52pojie.cn/forum.php')
-            for single_cookie in cookie.split('; '):
-                name, value = single_cookie.split('=', 1)
-                driver.add_cookie({ 'name': name, 'value': value })
-
-            driver.get('https://www.52pojie.cn/forum.php')
-           #  print(driver.page_source)
-
-           #  <p> 已经签到页面
-           #  <a href="home.php?mod=task&amp;do=apply&amp;id=2&amp;referer=%2Fforum.php"><img src="https://static.52pojie.cn/static/image/common/qds.png" class="qq_bind" align="absmiddle" alt=""></a> <span class="pipe">|</span><a href="home.php?mod=spacecp&amp;ac=credit&amp;showcredit=1" id="extcreditmenu" onmouseover="delayShow(this, showCreditmenu);" class="showmenu">积分: 11</a>
-           #  <span class="pipe">|</span><a href="home.php?mod=spacecp&amp;ac=usergroup" id="g_upmine" class="showmenu" onmouseover="delayShow(this, showUpgradeinfo)">用户组: 锋芒初露</a>
-           #  </p>
-
-           #  <p> 没有签到页面
-           #  <a href="javascript:void(0);"><img src="https://www.52pojie.cn/static/image/common/wbs.png" class="qq_bind" align="absmiddle" alt=""></a> <span class="pipe">|</span><a href="home.php?mod=spacecp&amp;ac=credit&amp;showcredit=1" id="extcreditmenu" onmouseover="delayShow(this, showCreditmenu);" class="showmenu">积分: 11</a>
-           #  <span class="pipe">|</span><a href="home.php?mod=spacecp&amp;ac=usergroup" id="g_upmine" class="showmenu" onmouseover="delayShow(this, showUpgradeinfo)">用户组: 锋芒初露</a>
-           #  </p>
-
-           #  <div id="um">
-           #  <div class="avt y"><a href="home.php?mod=space&amp;uid=720462"><img src="https://avatar.52pojie.cn/data/avatar/000/72/04/62_avatar_small.jpg" onerror="this.onerror=null;this.src='https://avatar.52pojie.cn/images/noavatar_small.gif'"></a></div>
-           #  <p>
-           #  <strong class="vwmy qq"><a href="home.php?mod=space&amp;uid=720462" target="_blank" title="访问我的空间">hong0980</a></strong>
-           #  <span class="pipe">|</span><a href="home.php?mod=space&amp;do=reward&amp;view=me" id="rewards" class="showmenu a" onmouseover="showMenu({'ctrlid':'rewards'})"><em class="showtipex"></em>悬赏</a><span class="pipe">|</span><a href="javascript:;" id="myitem" class="showmenu" onmouseover="showMenu({'ctrlid':'myitem'});">我的</a>
-           #  <span class="pipe">|</span><a href="home.php?mod=spacecp">设置</a>
-           #  <span class="pipe">|</span><a href="home.php?mod=space&amp;do=pm" id="pm_ntc">消息</a>
-           #  <span class="pipe">|</span><a href="home.php?mod=space&amp;do=notice" id="myprompt" class="a showmenu" onmouseover="showMenu({'ctrlid':'myprompt'});">提醒</a><span id="myprompt_check"></span>
-           #  <span class="pipe">|</span><a href="member.php?mod=logging&amp;action=logout&amp;formhash=700e89be">退出</a>
-           #  </p>
-           #  <p>
-           #  <img src="https://static.52pojie.cn/static/image/common/wbs.png" class="qq_bind" align="absmiddle" alt=""> <span class="pipe">|</span><a href="home.php?mod=spacecp&amp;ac=credit&amp;showcredit=1" id="extcreditmenu" onmouseover="delayShow(this, showCreditmenu);" class="showmenu">积分: 12</a>
-           #  <span class="pipe">|</span><a href="home.php?mod=spacecp&amp;ac=usergroup" id="g_upmine" class="showmenu" onmouseover="delayShow(this, showUpgradeinfo)">用户组: 锋芒初露</a>
-           #  </p>
-           #  </div>
-
-           #  # 等待页面加载完成，确保 #um 存在
-           #  um_element = WebDriverWait(driver, 10).until(
-           #      EC.presence_of_element_located((By.ID, "um"))
-           #  )
-           #  html_content = um_element.get_attribute('innerHTML')
-
-           #  # 执行签到函数
-           #  driver.execute_script(
-           #      """
-           #      function qianDao() {
-           #          if (location.pathname === '/home.php' && location.search.indexOf('mod=task') > -1) {
-           #              return;
-           #          }
-           #          let qiandao = document.querySelector('#um a[href^="home.php?mod=task&do=apply&id=2"]');
-           #          if (qiandao) {
-           #              let iframe = document.createElement('iframe');
-           #              document.lastElementChild.appendChild(iframe);
-           #              iframe.style = 'display: none;';
-           #              iframe.src = qiandao.href;
-           #              let img = qiandao.querySelector('.qq_bind');
-           #              if (img) {
-           #                  img.src = 'https://www.52pojie.cn/static/image/common/wbs.png';
-           #              }
-           #              qiandao.href = 'javascript:void(0);';
-           #          }
-           #      }
-           #      qianDao();
-           #      """
-           #  )
-           #  time.sleep(3)
-
-           # # 判断结果
-           #  try:
-           #      um_element.find_element(By.XPATH, './/img[contains(@src, "wbs.png")]')
-           #      res = "✅ 签到成功"
-           #  except NoSuchElementException:
-           #      try:
-           #          um_element.find_element(By.XPATH, './/img[contains(@src, "qds.png")]')
-           #          res = "🟡 签到失败"
-           #      except NoSuchElementException:
-           #          res = "无签到任务"
-
-        except TimeoutException as e:
-            res = f"{msg}<b><span style='color: red'>超时异常：</span></b>\n{e}"
-        except NoSuchElementException as e:
-            res = f"{msg}<b><span style='color: red'>签到失败：</span></b>\n{e}"
-        except WebDriverException as e:
-            res = f"{msg}<b><span style='color: red'>WebDriver异常：</span></b>\n{e}"
-        except Exception as e:
-            res = f"{msg}<b><span style='color: red'>未知异常：</span></b>\n{e}"
-        finally:
-            driver.quit()
-            shutil.rmtree(user_data_dir, ignore_errors=True)
-        return res
-
-    def main(self):
-        msg_all = ""
-        for i, check_item in enumerate(self.check_items, start=1):
-            cookie = check_item.get("cookie")
-            sign_msg = self.sign(cookie)
-            msg = f"账号 {i} 签到状态: {sign_msg}"
-            msg_all += msg + "\n\n"
-        return msg_all
+    return msg_all
 
 if __name__ == "__main__":
-    _data = get_data()
-    _check_items = _data.get("POJIE", [])
-    result = Pojie(check_items=_check_items).main()
+    result = main()
     # send("吾爱破解", result)
     print(result)
