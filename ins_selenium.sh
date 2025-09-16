@@ -5,8 +5,8 @@ cron: 1 1 1 1 *
 new Env('安装 selenium puppeteer tesseract);
 COMMENT
 
-js_pkgs="puppeteer-extra-plugin-stealth puppeteer-extra puppeteer-core jsutils"
-py_reqs="selenium-stealth pytesseract PyVirtualDisplay undetected-chromedriver psutil"
+js_pkgs="puppeteer-extra-plugin-stealth puppeteer-extra puppeteer-core"
+py_reqs="selenium-stealth pytesseract PyVirtualDisplay undetected-chromedriver"
 alpine_pkgs="freetype-dev ttf-freefont dbus chromium-chromedriver
 tesseract-ocr-data-eng libexif eudev xvfb
 alpine-sdk autoconf automake libtool"
@@ -16,7 +16,7 @@ install() {
     while [ $retry_count -lt $max_retries ]; do
         [[ $retry_count -gt 0 ]] && echo "$pkg (第 $((retry_count + 1)) 次) 尝试安装"
         if eval "$cmd"; then
-            echo -e "✅ $pkg 安装成功\n"
+            printf "✅ %-20s 安装成功\n\n" "$pkg"
             return
         fi
         retry_count=$((retry_count + 1))
