@@ -11,8 +11,12 @@ echo "=========================================="
 # 1. Alpine 换源
 echo "📦 配置Alpine国内镜像源..."
 if [ -f /etc/apk/repositories ]; then
+    cp /etc/apk/repositories /etc/apk/repositories.bak 2>/dev/null
     sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+    sed -i 's/http:\/\/dl-cdn.alpinelinux.org/https:\/\/mirrors.aliyun.com/g' /etc/apk/repositories
     echo "✅ Alpine镜像源已配置为阿里云"
+else
+    echo "⚠️  Alpine未找到，跳过配置"
 fi
 
 # 2. Python pip 换源
@@ -24,27 +28,52 @@ index-url = https://pypi.tuna.tsinghua.edu.cn/simple/
 extra-index-url =
     https://mirrors.aliyun.com/pypi/simple/
     https://pypi.mirrors.ustc.edu.cn/simple/
+    https://pypi.doubanio.com/simple/
 
 [install]
 trusted-host =
     pypi.tuna.tsinghua.edu.cn
     mirrors.aliyun.com
     pypi.mirrors.ustc.edu.cn
+    pypi.doubanio.com
 EOF
-echo "✅ Python pip源已配置(清华+阿里云+中科大)"
+echo "✅ Python pip源已配置(清华+阿里云+中科大+豆瓣)"
 
 # 3. NPM 换源
 echo "📦 配置NPM国内镜像源..."
 if command -v npm > /dev/null 2>&1; then
-	npm config set registry https://registry.npmmirror.com > /dev/null 2>&1
+    npm config set registry https://registry.npmmirror.com /dev/null 2>&1
+    echo "✅ NPM registry已配置为淘宝镜像"
 else
     echo "⚠️  NPM未安装，跳过配置"
 fi
 
-# 4. CPAN 换源 (Perl模块)
+# 4. Node.js 和 NPM 二进制镜像环境变量配置
+echo "🟢 配置Node.js和NPM国内镜像环境变量..."
+NODE_MIRROR_CONFIG='
+# Node.js and NPM mirrors
+export NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node
+export NODIST_NODE_MIRROR=https://npmmirror.com/mirrors/node
+export PHANTOMJS_CDNURL=https://npmmirror.com/mirrors/phantomjs
+export CHROMEDRIVER_CDNURL=https://npmmirror.com/mirrors/chromedriver
+export OPERADRIVER_CDNURL=https://npmmirror.com/mirrors/operadriver
+export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
+export SASS_BINARY_SITE=https://npmmirror.com/mirrors/node-sass
+export PUPPETEER_DOWNLOAD_HOST=https://npmmirror.com/mirrors
+export DISTURL=https://npmmirror.com/dist
+'
+
+# 写入bashrc
+echo "$NODE_MIRROR_CONFIG" >> ~/.bashrc
+# 设置当前会话的环境变量
+eval "$NODE_MIRROR_CONFIG"
+
+echo "✅ Node.js和NPM镜像环境变量已配置"
+
+# 5. CPAN 换源 (Perl模块)
 echo "🐪 配置CPAN国内镜像源..."
-mkdir -p /root/.cpan/CPAN/
 if command -v cpan > /dev/null 2>&1; then
+    mkdir -p /root/.cpan/CPAN/
     cat > /root/.cpan/CPAN/MyConfig.pm << 'EOF'
 $CPAN::Config = {
   'allow_installing_module_downgrades' => q[ask/no],
@@ -108,7 +137,7 @@ $CPAN::Config = {
   'test_report' => q[0],
   'trust_test_report_history' => q[0],
   'unzip' => q[/usr/bin/unzip],
-  'urllist' => [q[http://mirrors.ustc.edu.cn/CPAN/]],
+  'urllist' => [q[http://mirrors.ustc.edu.cn/CPAN/], q[http://mirrors.tuna.tsinghua.edu.cn/CPAN/]],
   'use_prompt_default' => q[0],
   'use_sqlite' => q[0],
   'version_timeout' => q[15],
@@ -118,18 +147,24 @@ $CPAN::Config = {
 };
 1;
 EOF
-    echo "✅ CPAN源已配置为清华镜像"
+    echo "✅ CPAN源已配置为清华和中科大镜像"
 else
     echo "⚠️  CPAN未安装，跳过配置"
 fi
+
 
 echo "=========================================="
 echo "🎉 青龙面板国内加速配置完成！"
 echo "📋 已配置:"
 echo "   - Alpine软件源 → 阿里云"
-echo "   - Python pip → 清华+阿里云+中科大"
-echo "   - NPM → 淘宝镜像"
-echo "   - CPAN → 清华镜像"
+echo "   - Python pip → 清华+阿里云+中科大+豆瓣"
+echo "   - NPM registry → 淘宝镜像"
+# echo "   - Node.js环境变量 → 包含所有二进制包镜像"
+echo "   - CPAN → 清华+中科大镜像"
 echo ""
 echo "💡 建议重启青龙容器使配置生效"
 echo "   docker restart qinglong"
+
+
+echo ""
+echo "✨ 所有配置已完成！"

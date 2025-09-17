@@ -2,10 +2,10 @@
 
 <<'COMMENT'
 cron: 1 1 1 1 *
-new Env('安装 selenium puppeteer tesseract);
+new Env('安装 selenium playwright tesseract);
 COMMENT
 
-js_pkgs="puppeteer-extra-plugin-stealth puppeteer-extra puppeteer-core"
+js_pkgs="playwright"
 py_reqs="selenium-stealth pytesseract PyVirtualDisplay undetected-chromedriver"
 alpine_pkgs="freetype-dev ttf-freefont dbus chromium-chromedriver
 tesseract-ocr-data-eng libexif eudev xvfb
