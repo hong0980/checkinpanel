@@ -116,7 +116,8 @@ config_cpan() {
         local cpan_conf_dir="/root/.cpan/CPAN"
         local cpan_conf_file="$cpan_conf_dir/MyConfig.pm"
         local mirror="http://mirrors.ustc.edu.cn/CPAN/"
-        mkdir -p "$cpan_conf_dir" || {
+        mkdir -p "$cpan_conf_dir"
+        [ -d "$cpan_conf_dir" ] || {
             log ERROR "无法创建 CPAN 配置目录 $cpan_conf_dir"
             return 1
         }
@@ -132,7 +133,7 @@ config_cpan() {
                 log INFO "已追加中科大镜像到 CPAN 配置"
             fi
         else
-cat > "$cpan_conf_file" <<-EOF
+cat > "$cpan_conf_file" <<-\EOF
 $CPAN::Config = {
   'allow_installing_module_downgrades' => q[ask/no],
   'allow_installing_outdated_dists' => q[ask/no],

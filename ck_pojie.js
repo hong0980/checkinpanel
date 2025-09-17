@@ -10,232 +10,105 @@ const magicJS = utils.MagicJS('吾爱破解', 'INFO');
 const COOKIES_POJIE = utils.getData().POJIE;
 const path = require('path');
 const fs = require('fs').promises;
-const crypto = require('crypto');
-const puppeteer = require('puppeteer-extra').use(
-    require('puppeteer-extra-plugin-stealth')()
-);
+const { chromium } = require('playwright');
 
-async function setupBrowser() {
-    const userDataDir = '/tmp/puppeteer_profile';
-    const browser = await puppeteer.launch({
+async function setupBrowser(userDataDir) {
+    const browser = await chromium.launchPersistentContext(userDataDir, {
         headless: true,
-        userDataDir,
         executablePath: '/usr/bin/chromium-browser',
-        args: ['--no-sandbox', '--disable-dev-shm-usage']
+        args: [
+            '--no-sandbox',
+            '--disable-gpu',
+            '--ignore-gpu-blocklist',
+            '--disable-dev-shm-usage',
+            '--disable-software-rasterizer',
+            '--disable-blink-features=AutomationControlled'
+        ],
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        extraHTTPHeaders: {
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        },
+        viewport: { width: 1280, height: 720 },
     });
 
-    const page = await browser.newPage();
-    await page.setUserAgent(
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140 Safari/537.36'
-    );
-    await page.setExtraHTTPHeaders({
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
+    await browser.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => false });
+        Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+        delete window.debugger;
+
+        const originalSetTimeout = window.setTimeout;
+        window.setTimeout = function (cb, timeout) {
+            if (typeof cb === 'function' && cb.toString().includes('debugger')) return;
+            if (typeof cb === 'string' && cb.includes('debugger')) return;
+            return originalSetTimeout.call(this, cb, timeout);
+        };
+
+        const originalSetInterval = window.setInterval;
+        window.setInterval = function (cb, timeout) {
+            if (typeof cb === 'function' && cb.toString().includes('debugger')) return;
+            if (typeof cb === 'string' && cb.includes('debugger')) return;
+            return originalSetInterval.call(this, cb, timeout);
+        };
     });
 
-    return { browser, page, userDataDir };
-}
-
-async function attachNetworkLogger(page, tag = 'default', options = {}) {
-    const {
-        logDir = '', urlPatterns = [], maxBodyLength = 0, saveBodies = false,
-        logRequests = false, onlyHtmlJson = false, logResponses = false, includeHeaders = false,
-    } = options;
-
-    for (const file of await fs.readdir(logDir)) {
-        file.startsWith('body_') && await fs.rm(path.join(logDir, file), { force: true });
-    }
-
-    const logFile = path.join(logDir, `52pojie_${tag}.log`);
-    const logStream = await fs.open(logFile, 'w');
-    await logStream.appendFile(`# 网络日志记录已启动于 ${magicJS.now()}\n`);
-    await logStream.appendFile(`# 页面: ${tag}\n`);
-    await logStream.appendFile(`# 日志文件: ${logFile}\n`);
-    await logStream.appendFile('==========================================\n\n');
-
-    function makeSafeFilename(url) {
-        const hash = crypto.createHash('md5').update(url).digest('hex');
-        return `body_${tag}_${hash}`;
-    }
-
-    function getFileExtension(url, contentType) {
-        if (!contentType) contentType = '';
-        if (contentType.includes('json')) return 'json';
-        if (contentType.includes('javascript')) return 'js';
-        if (contentType.includes('css')) return 'css';
-        if (contentType.includes('png')) return 'png';
-        if (contentType.includes('jpeg') || contentType.includes('jpg')) return 'jpg';
-        if (contentType.includes('gif')) return 'gif';
-        if (contentType.includes('svg')) return 'svg';
-        if (contentType.includes('html') || contentType.includes('text')) return 'html';
-
-        const match = url.match(/\.(html|js|css|png|jpg|jpeg|gif|svg)$/i);
-        if (match) return match[1].toLowerCase();
-        return 'bin';
-    }
-
-    function matchesPatterns(url, patterns) {
-        if (!patterns || patterns.length === 0) return true;
-        return patterns.some(p => new RegExp(p).test(url));
-    }
-
-    function shouldLog(url, contentType) {
-        const ext = getFileExtension(url, contentType);
-        return ['json', 'js', 'html'].includes(ext);
-    }
-
-    if (logRequests) {
-        page.on('request', async req => {
-            const url = req.url();
-            if (!matchesPatterns(url, urlPatterns)) return;
-
-            const ct = req.headers()['content-type'] || '';
-            if (!shouldLog(url, ct)) return;
-
-            try {
-                const postData = req.postData();
-                let logContent = [
-                    `请求时间 ${magicJS.now()}`,
-                    `方法: ${req.method()}`,
-                    `地址: ${url}`,
-                    `资源类型: ${req.resourceType()}`,
-                    `所属框架: ${req.frame()?.url() || '主框架'}`
-                ];
-                if (includeHeaders) logContent.push(`请求头: ${$.toStr(req.headers(), null, 2)}`);
-                if (postData) logContent.push(`POST 数据: ${postData.length > maxBodyLength ? postData.substring(0, maxBodyLength) + '...' : postData}`);
-                logContent.push('----------------------\n');
-                await logStream.appendFile(logContent.join('\n') + '\n');
-            } catch (e) {
-                console.error('请求日志记录错误:', e);
-            }
-        });
-    }
-
-    if (logResponses) {
-        page.on('response', async res => {
-            const url = res.url();
-            if (!matchesPatterns(url, urlPatterns)) return;
-
-            const contentType = res.headers()['content-type'] || '';
-            if (!shouldLog(url, contentType)) return;
-
-            try {
-                const request = res.request();
-                const buffer = await res.buffer();
-                const ext = getFileExtension(url, contentType);
-
-                let bodyFile = null;
-                if (saveBodies && (!onlyHtmlJson || ['html', 'json'].includes(ext))) {
-                    bodyFile = path.join(logDir, makeSafeFilename(url) + '.' + ext);
-                    await fs.writeFile(bodyFile, buffer);
-                }
-
-                let textPreview = buffer.toString('utf8', 0, Math.min(buffer.length, maxBodyLength));
-                const logContent = [
-                    `响应时间 ${magicJS.now()}`,
-                    `状态: ${res.status()}`,
-                    `地址: ${url}`,
-                    `来源请求: ${request?.method()} ${request?.url()}`,
-                    includeHeaders ? `响应头: \n${$.toStr(res.headers(), null, 2)}` : '',
-                    `响应体预览: \n${textPreview}`,
-                    bodyFile ? `完整响应体保存位置: ${bodyFile}` : '',
-                    '======================\n'
-                ];
-                await logStream.appendFile(logContent.join('\n') + '\n');
-            } catch (err) {
-                await logStream.appendFile(`响应错误 ${magicJS.now()} ${url} - ${err.message}\n`);
-            }
-        });
-    }
-
-    console.log(`📡 网络日志记录已启动: ${logFile}`);
-
-    return async () => {
-        try {
-            await logStream.appendFile(`# 网络日志记录已停止于 ${magicJS.now()}\n`);
-            await logStream.close();
-            console.log(`📋 网络日志已保存: ${logFile}`);
-        } catch (err) {
-            console.error('关闭日志流出错:', err);
-        }
-    };
+    return browser;
 }
 
 async function sign(cookie, index) {
+    const userDataDir = '/tmp/pw_user_data';
+    const context = await setupBrowser(userDataDir);
+    const msgHead = `---- 账号 ${index}: `;
     let msg = '';
-    const { browser, page, userDataDir } = await setupBrowser();
-    const closeLogger = await attachNetworkLogger(page, index, {
-        urlPatterns: ['mod=task&do=apply&id=2'],
-        logDir: '/tmp',
-        maxBodyLength: 2000,
-        saveBodies: true,
-        logRequests: true,
-        onlyHtmlJson: true,
-        logResponses: true,
-        includeHeaders: true
+
+    const cookies = cookie.split('; ').map(c => {
+        const [name, value] = c.split('=');
+        return { name, value, domain: 'www.52pojie.cn', path: '/', sameSite: 'Lax' };
     });
+    await context.addCookies(cookies);
+
+    const opts = { waitUntil: 'networkidle', timeout: 20000 };
 
     try {
-        const cookies = cookie.split('; ').map(c => {
-            const [name, value] = c.split('=');
-            return { name, value, domain: '.52pojie.cn', path: '/' };
-        });
-        await page.setCookie(...cookies);
+        const page = context.pages()[0] || await context.newPage();
+        await page.goto('https://www.52pojie.cn/forum.php', opts);
 
-        await page.goto('https://www.52pojie.cn/forum.php', {
-            waitUntil: 'domcontentloaded',
-            timeout: 30000
-        });
+        const [upmine, integral, username] = await Promise.allSettled([
+            page.locator('#g_upmine').textContent({ timeout: 2000 }),
+            page.locator('#extcreditmenu').textContent({ timeout: 2000 }),
+            page.locator('strong.vwmy a[href*="uid="]').textContent({ timeout: 2000 })
+        ]).then(r => r.map(x => x.status === 'fulfilled' ? x.value : null));
 
-        const pageContent = await page.content();
-        if (pageContent.includes('自动登录')) {
-            return `账号 ${index}: ❌ Cookie 可能失效，请重新获取`;
-        }
+        if (!upmine && !username)
+            return `${msgHead}❌ Cookie 可能失效，请重新获取`;
 
-        const username = await page.evaluate(() => {
-            const el = document.querySelector('strong.vwmy a[href*="uid="]');
-            return el ? el.textContent.trim() : '未知用户';
-        });
-        const integral = await page.evaluate(() => {
-            const el = document.querySelector('#extcreditmenu');
-            return el ? el.textContent.trim() : '未知';
-        });
-        const upmine = await page.evaluate(() => {
-            const el = document.querySelector('#g_upmine');
-            return el ? el.textContent.trim() : '未知';
-        });
+        msg = `${msgHead}${username} ----\n`;
 
-        msg = `---- 账号 ${index}: ${username} ----\n`;
+        const signLink = await page
+            .locator('a[href*="mod=task&do=apply&id=2"]',
+                { has: page.locator('img[title*="领取今日签到奖励"]') })
+            .getAttribute('href', { timeout: 1500 })
+            .catch(() => null);
 
-        const alreadySigned = await page.$('img.qq_bind[src*="wbs.png"]');
-        if (alreadySigned) {
+        if (!signLink)
             return `${msg}✅ 今天已经签到过了\n积分: ${integral} | 威望: ${upmine}`;
-        }
-        await page.waitForSelector('#um', { timeout: 5000 });
-        await page.evaluate(() => {
-            let qiandao = document.querySelector('#um a[href^="home.php?mod=task&do=apply&id=2"]');
-            if (!qiandao) return;
-            let iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = qiandao.href;
-            document.body.appendChild(iframe);
-            qiandao.href = 'javascript:void(0);';
-        });
 
-        magicJS.sleep(3000);
-        await page.reload({ waitUntil: ['networkidle0'] });
+        await page.goto(`https://www.52pojie.cn/${signLink}`, opts);
+        await magicJS.sleep(3000);
+        await page.goto('https://www.52pojie.cn/forum.php', opts);
 
-        const signedInAfter = await page.$('img.qq_bind[src*="wbs.png"]');
-        if (signedInAfter) {
-            msg += `✅ 签到成功\n积分: ${integral} | 威望: ${upmine}`;
-        } else {
-            msg += `❌ 签到失败\n积分: ${integral} | 威望: ${upmine}`;
-        }
-        await closeLogger();
+        const signed = await page
+            .waitForSelector('a[href*="mod=task&do=apply&id=2"]', { state: 'detached', timeout: 1000 })
+            .then(() => true)
+            .catch(() => false);
+
+        msg += `${magicJS.today()} ${signed ? '✅ 签到成功' : '❌ 签到失败'}\n积分: ${integral} | 威望: ${upmine}`;
+
     } catch (err) {
         msg += `❌ 异常: ${err.message}`;
     } finally {
-        await browser.close();
-        await fs.rm(userDataDir, { recursive: true, force: true });
+        await context.close().catch(() => {});
+        await fs.rm(userDataDir, { recursive: true, force: true }).catch(() => {});
     }
 
     return msg;
