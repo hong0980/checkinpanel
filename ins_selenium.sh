@@ -16,7 +16,7 @@ install() {
     while [ $retry_count -lt $max_retries ]; do
         [[ $retry_count -gt 0 ]] && echo "$pkg (第 $((retry_count + 1)) 次) 尝试安装"
         if eval "$cmd"; then
-            printf "✅ %-20s 安装成功\n\n" "$pkg"
+            printf "%-25s 安装成功 ✅\n\n" "$pkg"
             return
         fi
         retry_count=$((retry_count + 1))
