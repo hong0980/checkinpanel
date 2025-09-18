@@ -15,6 +15,9 @@ const { chromium } = require('playwright');
 async function setupBrowser(userDataDir) {
     const browser = await chromium.launchPersistentContext(userDataDir, {
         headless: true,
+        ignoreHTTPSErrors: true,
+        javaScriptEnabled: true,
+        baseURL: 'https://www.52pojie.cn/',
         executablePath: '/usr/bin/chromium-browser',
         args: [
             '--no-sandbox',
@@ -71,7 +74,7 @@ async function sign(cookie, index) {
 
     try {
         const page = context.pages()[0] || await context.newPage();
-        await page.goto('https://www.52pojie.cn/forum.php', opts);
+        await page.goto('/forum.php', opts);
 
         const [upmine, integral, username] = await Promise.allSettled([
             page.locator('#g_upmine').textContent({ timeout: 2000 }),
@@ -93,9 +96,9 @@ async function sign(cookie, index) {
         if (!signLink)
             return `${msg}✅ 今天已经签到过了\n积分: ${integral} | 威望: ${upmine}`;
 
-        await page.goto(`https://www.52pojie.cn/${signLink}`, opts);
+        await page.goto(signLink, opts);
         await magicJS.sleep(3000);
-        await page.goto('https://www.52pojie.cn/forum.php', opts);
+        await page.goto('/forum.php', opts);
 
         const signed = await page
             .waitForSelector('a[href*="mod=task&do=apply&id=2"]', { state: 'detached', timeout: 1000 })
