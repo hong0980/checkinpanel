@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const toml = require('@iarna/toml');
 const V2P_PATH = '/usr/local/app/script/Lists/';
 const QL_NEW_PATH = '/ql/data/config/';
@@ -734,10 +735,74 @@ function MagicJS(scriptName = "MagicJS", logLevel = "INFO") {
         }
     }(scriptName)
 }
+
+function networkLog(page, options = {}) {
+    const { filter = null, saveToFile = null, filename = 'network-log.json' } = options;
+    const magicjs = MagicJS('networkLog', 'INFO');
+    const logs = [];
+
+    const mapRequest = (req) => ({
+        时间: req.timestamp,
+        方法: req.method,
+        请求地址: req.url,
+        请求头: req.headers,
+        请求体: req.postData
+    });
+
+    const mapResponse = (res) => ({
+        时间: res.timestamp,
+        状态码: res.status,
+        请求地址: res.url,
+        响应头: res.headers,
+        响应内容预览: res.bodyPreview
+    });
+
+    page.on('request', request => {
+        if (filter && !request.url().includes(filter)) return;
+
+        const reqLog = {
+            timestamp: magicjs.now(),
+            method: request.method(),
+            url: request.url(),
+            headers: request.headers(),
+            postData: request.postData() || ''
+        };
+
+        logs.push({ 类型: '请求', ...mapRequest(reqLog) });
+        console.log('\n=== 请求 ===', mapRequest(reqLog));
+    });
+
+    page.on('response', async response => {
+        if (filter && !response.url().includes(filter)) return;
+
+        const resLog = {
+            timestamp: magicjs.now(),
+            status: response.status(),
+            url: response.url(),
+            headers: response.headers(),
+        };
+
+        try {
+            const body = await response.text();
+            resLog.bodyPreview = body.substring(0, 200);
+        } catch (e) {
+            resLog.bodyPreview = `响应体读取失败: ${e.message}`;
+        }
+
+        logs.push({ 类型: '响应', ...mapResponse(resLog) });
+        console.log('\n--- 响应 ---', mapResponse(resLog));
+
+        if (saveToFile) {
+            fs.writeFileSync(path.resolve('/tmp', filename), JSON.stringify(logs, null, 2), 'utf-8');
+        }
+    });
+}
+
 module.exports = {
     getData,
     getNotifyData,
     sleep,
     Env,
     MagicJS,
+    networkLog
 };

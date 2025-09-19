@@ -88,8 +88,7 @@ async function sign(cookie, index) {
         msg = `${msgHead}${username} ----\n`;
 
         const signLink = await page
-            .locator('a[href*="mod=task&do=apply&id=2"]',
-                { has: page.locator('img[title*="领取今日签到奖励"]') })
+            .locator('#um a[href^="home.php?mod=task&do=apply&id=2"]')
             .getAttribute('href', { timeout: 1500 })
             .catch(() => null);
 
