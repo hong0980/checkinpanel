@@ -76,8 +76,8 @@ class V2ex:
             sign_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[type="button"]'))
             )
-            name_element = driver.find_element(By.XPATH, '//span[@class="bigger"]')
-            msg = f"---- {name_element.text} V2EX 签到状态 ----\n"
+            name_element = driver.find_element(By.CSS_SELECTOR, '.bigger a')
+            msg = f"----账号 {i} {name_element.text} V2EX 签到状态 ----\n"
 
             res = f"{msg}<b><span style='color: green'>今天已经签到过了</span></b>"
             if '领取 X 铜币' in sign_button.get_attribute('value'):

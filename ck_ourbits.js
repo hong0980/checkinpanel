@@ -1,16 +1,21 @@
 /*
- * OurBits 破解
- * cron "1 0,11 * * *" ck_ourbits.js
+OurBits 签到
+cron "1 0,11 * * *" ck_ourbits.js
  */
 
 const utils = require('./utils');
-const notify = require('./notify');
-const $ = new utils.Env('OurBits');
-const magicJS = utils.MagicJS('OurBits', 'INFO');
-const COOKIES_OURBITS = utils.getData().OURBITS;
+const Env = utils.Env;
+const MagicJS = utils.MagicJS;
+const getData = utils.getData;
+
+const $ = new Env('OurBits 签到');
+const notify = $.isNode() ? require('./notify') : '';
+const magicJS = MagicJS('OurBits', 'INFO');
+const COOKIES_OURBITS = getData().OURBITS;
+
 const path = require('path');
 const fs = require('fs').promises;
-const ua = require('./JS_USER_AGENTS.js');
+const ua = require('./Mobile_User_Agent.js');
 const { chromium } = require('playwright-extra');
 // const stealthPlugin = require('puppeteer-extra-plugin-stealth');
 // chromium.use(stealthPlugin());

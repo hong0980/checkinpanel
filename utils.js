@@ -737,9 +737,23 @@ function MagicJS(scriptName = "MagicJS", logLevel = "INFO") {
 }
 
 function networkLog(page, options = {}) {
-    const { filter = null, saveToFile = null, filename = 'network-log.json' } = options;
+    const {
+        filter = null,
+        saveToFile = null,
+        filename = 'network-log.json',
+        excludeExtensions = ['png', 'jpg', 'jpeg', 'gif', 'ttf', 'css', 'ico', 'svg']
+    } = options;
     const magicjs = MagicJS('networkLog', 'INFO');
     const logs = [];
+
+    const shouldExclude = (url) => {
+        if (!excludeExtensions || excludeExtensions.length === 0) return false;
+
+        const extPattern = excludeExtensions.join('|');
+        const regex = new RegExp(`\\.(${extPattern})(\\?.*)?$`, 'i'); // 'i' 表示不区分大小写
+
+        return regex.test(url);
+    };
 
     const mapRequest = (req) => ({
         时间: req.timestamp,
@@ -759,6 +773,7 @@ function networkLog(page, options = {}) {
 
     page.on('request', request => {
         if (filter && !request.url().includes(filter)) return;
+        if (shouldExclude(request.url())) return;
 
         const reqLog = {
             timestamp: magicjs.now(),
@@ -769,11 +784,12 @@ function networkLog(page, options = {}) {
         };
 
         logs.push({ 类型: '请求', ...mapRequest(reqLog) });
-        console.log('\n=== 请求 ===', mapRequest(reqLog));
+        console.log('\n=== 请求 ===\n', mapRequest(reqLog));
     });
 
     page.on('response', async response => {
         if (filter && !response.url().includes(filter)) return;
+        if (shouldExclude(response.url())) return;
 
         const resLog = {
             timestamp: magicjs.now(),
@@ -784,13 +800,13 @@ function networkLog(page, options = {}) {
 
         try {
             const body = await response.text();
-            resLog.bodyPreview = body.substring(0, 200);
+            resLog.bodyPreview = body.substring(0, 400);
         } catch (e) {
             resLog.bodyPreview = `响应体读取失败: ${e.message}`;
         }
 
         logs.push({ 类型: '响应', ...mapResponse(resLog) });
-        console.log('\n--- 响应 ---', mapResponse(resLog));
+        console.log('\n--- 响应 ---\n', mapResponse(resLog));
 
         if (saveToFile) {
             fs.writeFileSync(path.resolve('/tmp', filename), JSON.stringify(logs, null, 2), 'utf-8');
