@@ -229,7 +229,7 @@ main() {
     config_alpine
     config_pip
     config_npm
-    config_cpan
+    # config_cpan
 
     log INFO "=========================================="
     log INFO "🎉 青龙面板国内加速配置完成！"
@@ -237,7 +237,7 @@ main() {
     log INFO "   - Alpine 软件源 → 阿里云"
     log INFO "   - Python pip → 清华+阿里云+中科大"
     log INFO "   - NPM → 淘宝镜像 + Node.js 环境变量"
-    log INFO "   - CPAN → 中科大镜像（追加或新建）"
+    # log INFO "   - CPAN → 中科大镜像（追加或新建）"
     log INFO ""
 }
 

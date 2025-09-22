@@ -5,7 +5,7 @@ cron: 1 1 1 1 *
 new Env('安装 selenium playwright tesseract);
 COMMENT
 
-js_pkgs="playwright puppeteer-extra-plugin-stealth puppeteer-extra puppeteer-core"
+js_pkgs="playwright playwright-extra puppeteer-extra-plugin-stealth puppeteer-extra puppeteer-core rimraf"
 py_reqs="selenium-stealth pytesseract PyVirtualDisplay undetected-chromedriver"
 alpine_pkgs="freetype-dev ttf-freefont dbus chromium-chromedriver
 tesseract-ocr-data-eng libexif eudev xvfb

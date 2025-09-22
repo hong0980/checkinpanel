@@ -13,185 +13,218 @@ const notify = $.isNode() ? require('./notify') : '';
 const magicJS = MagicJS('OurBits', 'INFO');
 const COOKIES_OURBITS = getData().OURBITS;
 
+const fs = require('fs');
 const path = require('path');
-const fs = require('fs').promises;
-const ua = require('./Mobile_User_Agent.js');
+const { rimraf } = require('rimraf');
 const { chromium } = require('playwright-extra');
-// const stealthPlugin = require('puppeteer-extra-plugin-stealth');
-// chromium.use(stealthPlugin());
+const stealthPlugin = require('puppeteer-extra-plugin-stealth');
+chromium.use(stealthPlugin());
 
-function getPlatformInfo(userAgent) {
-    // 优先 Android 绕过 PAT
-    if (userAgent.includes('Android')) {
-        return {
-            platform: 'Android',
-            secChUa: '"Chromium";v="130", "Not:A-Brand";v="24", "Google Chrome";v="130"',
-            secChUaPlatform: '"Android"',
-            viewport: { width: 412, height: 915 }, // Redmi Note 7
-        };
-    } else if (userAgent.includes('iPad')) {
-        return {
-            platform: 'iPad',
-            secChUa: '"Not;A=Brand";v="8", "Chromium";v="130", "Mobile Safari";v="17.0"',
-            secChUaPlatform: '"iOS"',
-            viewport: { width: 1024, height: 768 }, // iPad6,3
-        };
-    } else {
-        return {
-            platform: 'iPhone',
-            secChUa: '"Not;A=Brand";v="8", "Chromium";v="130", "Mobile Safari";v="17.0"',
-            secChUaPlatform: '"iOS"',
-            viewport: { width: 390, height: 844 }, // iPhone 14
-        };
-    }
+async function injectAdvancedStealth(page) {
+    await page.addInitScript(() => {
+        try {
+            // navigator.webdriver
+            Object.defineProperty(navigator, 'webdriver', { get: () => false });
+
+            // window.chrome
+            window.chrome = window.chrome || {};
+            window.chrome.runtime = {};
+            window.chrome.csi = () => {};
+            window.chrome.loadTimes = () => {};
+            window.chrome.webstore = {};
+
+            // hardware / memory / languages
+            Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+            Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+            Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en-US'] });
+
+            // connection
+            Object.defineProperty(navigator, 'connection', {
+                get: () => ({
+                    downlink: 10,
+                    effectiveType: '4g',
+                    rtt: 50,
+                    saveData: false,
+                    addEventListener: () => {},
+                    removeEventListener: () => {}
+                })
+            });
+
+            // plugins & mimeTypes
+            const makePlugin = (name, filename, description) => ({ name, filename, description });
+            const plugins = [
+                makePlugin('Chrome PDF Plugin', 'internal-pdf-viewer', 'Portable Document Format'),
+                makePlugin('Chrome PDF Viewer', 'mhjfbmdgcfjbbpaeojofohoefgiehjai', ''),
+                makePlugin('Native Client', 'internal-nacl-plugin', '')
+            ];
+            const pluginArray = plugins.slice();
+            pluginArray.item = i => pluginArray[i] || null;
+            pluginArray.namedItem = n => pluginArray.find(p => p.name === n) || null;
+            Object.defineProperty(navigator, 'plugins', { get: () => pluginArray });
+
+            const mimeTypes = [
+                { type: 'application/pdf', suffixes: 'pdf', description: 'Portable Document Format' }
+            ];
+            const mimeArray = mimeTypes.slice();
+            mimeArray.item = i => mimeArray[i] || null;
+            mimeArray.namedItem = t => mimeArray.find(m => m.type === t) || null;
+            Object.defineProperty(navigator, 'mimeTypes', { get: () => mimeArray });
+
+            // Canvas
+            const origGetContext = HTMLCanvasElement.prototype.getContext;
+            HTMLCanvasElement.prototype.getContext = function (type, ...args) {
+                const ctx = origGetContext.apply(this, [type, ...args]);
+                if (type === '2d' && ctx) {
+                    const origGetImageData = ctx.getImageData;
+                    ctx.getImageData = function (x, y, w, h) {
+                        const img = origGetImageData.apply(this, [x, y, w, h]);
+                        for (let i = 0; i < img.data.length; i += 4) {
+                            img.data[i] ^= 0x01;
+                        }
+                        return img;
+                    };
+                }
+                return ctx;
+            };
+
+            const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
+            HTMLCanvasElement.prototype.toDataURL = function (...args) {
+                const result = origToDataURL.apply(this, args);
+                const img = new Image();
+                img.src = result;
+                const canvas = document.createElement('canvas');
+                canvas.width = this.width;
+                canvas.height = this.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                for (let i = 0; i < data.data.length; i += 4) {
+                    data.data[i] += Math.random() * 0.1;
+                }
+                ctx.putImageData(data, 0, 0);
+                return canvas.toDataURL(...args);
+            };
+
+            // WebGL
+            const proto = WebGLRenderingContext && WebGLRenderingContext.prototype;
+            if (proto) {
+                const origGetParam = proto.getParameter;
+                proto.getParameter = function (p) {
+                    if (p === 37445) return 'Intel Inc.';
+                    if (p === 37446) return 'Intel Iris OpenGL Engine';
+                    return origGetParam.apply(this, [p]);
+                };
+                const origGetShaderPrecision = proto.getShaderPrecisionFormat;
+                proto.getShaderPrecisionFormat = function () {
+                    return { rangeMin: -126, rangeMax: 127, precision: 23 };
+                };
+            }
+
+            // AudioContext
+            const origGetChannelData = AudioBuffer.prototype.getChannelData;
+            AudioBuffer.prototype.getChannelData = function () {
+                const data = origGetChannelData.apply(this, arguments);
+                const out = new Float32Array(data.length);
+                for (let i = 0; i < data.length; i++) out[i] = data[i] + 1e-7;
+                return out;
+            };
+
+            // mediaDevices
+            if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+                const origEnum = navigator.mediaDevices.enumerateDevices.bind(navigator.mediaDevices);
+                navigator.mediaDevices.enumerateDevices = async function () {
+                    try {
+                        const d = await origEnum();
+                        if (d && d.length) return d;
+                    } catch {}
+                    return [
+                        { kind: 'audioinput', label: 'Default Microphone', deviceId: 'default' },
+                        { kind: 'videoinput', label: 'Integrated Camera', deviceId: 'camera1' }
+                    ];
+                };
+            }
+
+            // Fonts
+            Object.defineProperty(window, 'FontFace', {
+                value: class FontFace {
+                    constructor(family, src) {
+                        this.family = family;
+                        this.src = src;
+                    }
+                }
+            });
+            const fonts = ['Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New'];
+            Object.defineProperty(document, 'fonts', {
+                get: () => ({
+                    forEach: (cb) => fonts.forEach(f => cb({ family: f })),
+                    size: fonts.length
+                })
+            });
+        } catch {}
+    });
 }
 
-async function setupBrowser(userDataDir) {
-    let userAgent = ua.USER_AGENT;
-    if (!userAgent.includes('Android')) {
-        userAgent = 'Mozilla/5.0 (Linux; Android 10; Redmi Note 7 Build/QKQ1.190910.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.6723.73 Mobile Safari/537.36';
+async function simulateHumanMouse(page) {
+    const viewport = await page.viewportSize();
+    const centerX = viewport.width / 2;
+    const centerY = viewport.height / 2;
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(100);
+    for (let i = 0; i < 5; i++) {
+        const x = centerX + Math.random() * 100 - 50;
+        const y = centerY + Math.random() * 100 - 50;
+        await page.mouse.move(x, y, { steps: 10 });
+        await page.waitForTimeout(200 + Math.random() * 300);
     }
-    const { platform, secChUa, secChUaPlatform, viewport } = getPlatformInfo(userAgent);
+    await page.mouse.click(centerX, centerY);
+}
 
-    const browser = await chromium.launchPersistentContext(userDataDir, {
-        headless: true, // 调试用 false，生产用 true
-        ignoreHTTPSErrors: true,
-        javaScriptEnabled: true,
-        baseURL: 'https://ourbits.club/',
+async function setupBrowser() {
+    const userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0'
+    ];
+    const viewports = [
+        { width: 1366, height: 768 },
+        { width: 1920, height: 1080 },
+        { width: 1440, height: 900 }
+    ];
+
+    const browser = await chromium.launch({
+        headless: true,
         executablePath: '/usr/bin/chromium-browser',
         args: [
             '--no-sandbox',
-            '--disable-gpu',
-            '--ignore-gpu-blocklist',
             '--disable-dev-shm-usage',
-            '--disable-software-rasterizer',
             '--disable-blink-features=AutomationControlled',
-            '--disable-infobars',
-            `--window-size=${viewport.width},${viewport.height}`,
-            '--disable-extensions',
-            '--disable-background-networking',
-            '--disable-sync',
-            '--no-first-run',
-            '--no-default-browser-check',
-            '--disable-web-security',
-            '--disable-features=IsolateOrigins,site-per-process',
-        ],
-        userAgent: userAgent,
-        extraHTTPHeaders: {
-            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'Sec-Ch-Ua': secChUa,
-            'Sec-Ch-Ua-Platform': secChUaPlatform,
-            'Sec-Ch-Ua-Mobile': '?1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Upgrade-Insecure-Requests': '1',
-            'Accept-Encoding': 'gzip, deflate, br',
-        },
-        viewport: viewport,
-        locale: 'zh-CN',
-        timezoneId: 'Asia/Shanghai',
-        geolocation: { latitude: 39.9042, longitude: 116.4074 },
-        permissions: ['geolocation'],
+            '--window-size=1366,768'
+        ]
     });
 
-    // 增强指纹伪装
-    await browser.addInitScript((platform) => {
-        // 隐藏自动化痕迹
-        Object.defineProperty(navigator, 'webdriver', { get: () => false });
-        Object.defineProperty(navigator, 'platform', {
-            get: () => platform === 'Android' ? 'Linux armv8l' : platform === 'iPad' ? 'iPad' : 'iPhone'
-        });
-        Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 4 });
-        Object.defineProperty(navigator, 'deviceMemory', { get: () => 4 });
-        Object.defineProperty(navigator, 'plugins', { get: () => [] });
-        Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en'] });
-        Object.defineProperty(navigator, 'userAgent', {
-            get: () => platform === 'Android' ?
-                'Mozilla/5.0 (Linux; Android 10; Redmi Note 7 Build/QKQ1.190910.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.6723.73 Mobile Safari/537.36' :
-                'Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148'
-        });
+    const context = await browser.newContext({
+        locale: 'zh-CN',
+        timezoneId: 'Asia/Shanghai',
+        permissions: ['geolocation'],
+        baseURL: 'https://ourbits.club',
+        userAgent: userAgents[Math.floor(Math.random() * userAgents.length)],
+        viewport: viewports[Math.floor(Math.random() * viewports.length)],
+        geolocation: { latitude: 39.9042, longitude: 116.4074 },
+        extraHTTPHeaders: {
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        }
+    });
 
-        // Chrome 对象（仅 Android）
-        Object.defineProperty(window, 'chrome', {
-            get: () => platform === 'Android' ? ({ runtime: {}, loadTimes: () => ({}), csi: () => ({}) }) : undefined
-        });
-
-        // 屏幕分辨率
-        Object.defineProperty(screen, 'availWidth', { get: () => platform === 'Android' ? 412 : platform === 'iPad' ? 1024 : 390 });
-        Object.defineProperty(screen, 'availHeight', { get: () => platform === 'Android' ? 915 : platform === 'iPad' ? 768 : 844 });
-        Object.defineProperty(window, 'outerWidth', { get: () => platform === 'Android' ? 412 : platform === 'iPad' ? 1024 : 390 });
-        Object.defineProperty(window, 'outerHeight', { get: () => platform === 'Android' ? 915 : platform === 'iPad' ? 768 : 844 });
-
-        // 防止 debugger 干扰
-        delete window.debugger;
-        const originalSetTimeout = window.setTimeout;
-        window.setTimeout = function (cb, timeout) {
-            if (typeof cb === 'function' && cb.toString().includes('debugger')) return;
-            if (typeof cb === 'string' && cb.includes('debugger')) return;
-            return originalSetTimeout.call(this, cb, timeout);
-        };
-        const originalSetInterval = window.setInterval;
-        window.setInterval = function (cb, timeout) {
-            if (typeof cb === 'function' && cb.toString().includes('debugger')) return;
-            if (typeof cb === 'string' && cb.includes('debugger')) return;
-            return originalSetInterval.call(this, cb, timeout);
-        };
-
-        // 模拟移动端触摸和滚动
-        setInterval(() => {
-            const touchX = Math.random() * window.innerWidth;
-            const touchY = Math.random() * window.innerHeight;
-            window.dispatchEvent(new TouchEvent('touchstart', {
-                changedTouches: [{ clientX: touchX, clientY: touchY }],
-                bubbles: true,
-            }));
-            window.dispatchEvent(new TouchEvent('touchmove', {
-                changedTouches: [{ clientX: touchX + (Math.random() * 20 - 10), clientY: touchY + (Math.random() * 20 - 10) }],
-                bubbles: true,
-            }));
-            window.scrollTo(0, Math.random() * document.body.scrollHeight);
-        }, 1000 + Math.random() * 2000);
-
-        // Canvas 噪声（增强）
-        const originalGetContext = HTMLCanvasElement.prototype.getContext;
-        HTMLCanvasElement.prototype.getContext = function (type) {
-            if (type === '2d') {
-                const context = originalGetContext.apply(this, arguments);
-                const originalGetImageData = context.getImageData;
-                context.getImageData = function (...args) {
-                    const imageData = originalGetImageData.apply(this, args);
-                    for (let i = 0; i < imageData.data.length; i += 4) {
-                        imageData.data[i] += Math.random() * 0.2 - 0.1; // 增强噪声
-                        imageData.data[i + 1] += Math.random() * 0.2 - 0.1;
-                        imageData.data[i + 2] += Math.random() * 0.2 - 0.1;
-                    }
-                    return imageData;
-                };
-                return context;
-            }
-            return originalGetContext.apply(this, arguments);
-        };
-
-        const originalGetParameter = WebGLRenderingContext.prototype.getParameter;
-        WebGLRenderingContext.prototype.getParameter = function (parameter) {
-            if (parameter === 37446) return platform === 'Android' ? 'Qualcomm' : 'Apple Inc.'; // VENDOR
-            if (parameter === 37447) return platform === 'Android' ? 'Adreno (TM) 615' : 'Apple GPU'; // RENDERER
-            return originalGetParameter.call(this, parameter);
-        };
-
-        Object.defineProperty(window, 'devicePixelRatio', { get: () => platform === 'Android' ? 2.625 : 3 });
-        Object.defineProperty(navigator, 'maxTouchPoints', { get: () => platform === 'Android' ? 5 : 10 });
-    }, platform);
-    return browser;
+    const page = await context.newPage();
+    await injectAdvancedStealth(page);
+    await simulateHumanMouse(page);
+    return { browser, context, page };
 }
 
 async function sign(cookie, index) {
-    const userDataDir = path.join('/tmp', `pw_user_data_${index}`);
-    const context = await setupBrowser(userDataDir);
     const msgHead = `---- 账号 ${index}: `;
-    let msg = '', result = '';
+    let msg = '', result = '', signed = '';
+    const { browser, context, page } = await setupBrowser();
 
     const cookies = cookie.split('; ').map(c => {
         const [name, value] = c.split('=');
@@ -200,14 +233,18 @@ async function sign(cookie, index) {
     await context.addCookies(cookies);
 
     try {
-        const page = context.pages()[0] || await context.newPage();
         await page.goto('/torrents.php', { timeout: 30000 });
-        await page.waitForTimeout(1000 + Math.random() * 2000);
-        await page.mouse.move(Math.random() * 800 + 100, Math.random() * 600 + 100);
-        await page.evaluate(() => window.scrollTo(0, Math.random() * document.body.scrollHeight));
 
-        const username = await page.locator('a.CrazyUser_Name b').textContent({ timeout: 5000 }).catch(() => null);
-        if (!username) return `❌ ${msgHead} Cookie 可能失效，请重新获取`;
+        // 这里可做自动化交互：模拟真实用户的鼠标/键盘行为
+        await page.mouse.move(100, 100);
+        await page.mouse.down();
+        await page.mouse.move(200, 200, { steps: 10 });
+        await page.mouse.up();
+        await page.waitForTimeout(1200);
+
+        const username = await page.locator('a.CrazyUser_Name b')
+            .textContent({ timeout: 5000 }).catch(() => {});
+        if (!username) return `${msgHead} ❌ Cookie 可能失效，请重新获取 ----`;
 
         const html = await page.$eval('span.medium', el => el.outerHTML);
         const pattern = /魔力值[^:]*:\s*([\d,]+\.\d+).*?分享率：<\/span>\s*([\d.]+).*?上传量：<\/font>\s*([\d.]+)\s*TB.*?下载量：<\/font>\s*([\d.]+)\s*GB.*?当前做种[^>]*>(\d+)/s;
@@ -216,28 +253,56 @@ async function sign(cookie, index) {
             result = `魔力值: ${match[1]}\n分享率： ${match[2]}\n上传量： ${match[3]} TB\n下载量： ${match[4]} GB\n做种中: ${match[5]}`;
         }
 
-        if (html.includes('签到已得')) {
-            return `✅ ${msgHead}${username} 今天已经签到过了\n${result}`;
-        }
+        if (html.includes('签到已得')) return `${magicJS.now()}\n${msgHead}${username} ✅ 今天已经签到过了 ----\n${result}`;
 
-        utils.networkLog(page, {
-            filter: "cloudflare",
+        const { logs, stop, getToken } = await utils.networkLog(page, {
             saveToFile: true,
-            filename: "cloudflare-log.json"
+            body_length: 1000,
+            filename: "OurBits-log.json",
+            filter: ["cloudflare", "turnstile"],
         });
-        await page.goto('https://ourbits.club/attendance.php', {
-            timeout: 16000,
-            waitUntil: 'networkidle'
-        }).catch(null);
 
-        msg += `\n${result}`;
+        await page.goto('/attendance.php',
+            { timeout: 30000, waitUntil: 'networkidle' }
+        ).catch(() => console.log('❌ ❌ ❌ 执行完成'));
+
+        const main = await page.locator('#outer table.main[width="940"]')
+            .evaluate(el => el.outerHTML)
+            .catch(() => '签到表单未找到');
+        console.log(main)
+
+        // const token = await page.waitForFunction(() => {
+        //     const input = document.querySelector('input[name="cf-turnstile-response"]');
+        //     return input?.value || null; // 返回 value 或继续等待
+        // }, { timeout: 20000 }).catch(() => {});
+
+        // if (token) {
+        //     console.log('✅ Token:', token);
+        //     await page.evaluate(() => {
+        //         document.querySelector('form#attendance').submit();
+        //     });
+        // } else {
+        //     console.log('❌ Turnstile 未返回 token');
+        // }
+
+        const content = await page.content()
+        fs.writeFileSync('/tmp/OurBits.html', content);
+        // const element = await page.$('form#attendance'); // 选中元素截图
+        await page.screenshot({ path: '/tmp/OurBits.png', fullPage: true });
+
+        // console.log(content)
+        const sigContent = await page.content();
+        if (sigContent.includes('签到成功')) {
+            signed = await page.locator('#outer table[cellspacing="0"][border="1"] td.text')
+                .textContent({ timeout: 3000 }).catch(() => {});
+        }
+        msg = `${magicJS.now()}\n${msgHead}${username} ${signed ? `签到成功 ✅\n${signed} ----` : `签到失败 ❌ ----`}\n${result}`;
 
     } catch (err) {
         msg += `❌ 异常: ${err.message}`;
     } finally {
-        await context.close().catch(() => {});
-        await fs.rm(userDataDir, { recursive: true, force: true }).catch(() => {});
-        await fs.rm('/tmp/puppeteer_dev*', { recursive: true, force: true }).catch(() => {});
+        await browser.close().catch(() => {});
+        await rimraf('/tmp/puppeteer_dev*', { glob: true }).catch(() => {});
     }
     return msg
 }
@@ -257,7 +322,7 @@ async function main() {
 
         msgAll += `${signMsg}\n-----------------------------------\n\n`;
         if (i < COOKIES_OURBITS.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 5000 + Math.random() * 10000));
+            await magicJS.sleep(3000)
         }
     }
 

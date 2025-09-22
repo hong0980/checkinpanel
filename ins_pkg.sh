@@ -101,4 +101,4 @@ install_perl_modules() {
 install_alpine_packages
 install_python_packages
 install_node_packages
-install_perl_modules
+# install_perl_modules
