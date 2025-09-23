@@ -9,7 +9,7 @@ js_pkgs="playwright playwright-extra puppeteer-extra-plugin-stealth puppeteer-ex
 py_reqs="selenium-stealth pytesseract PyVirtualDisplay undetected-chromedriver"
 alpine_pkgs="freetype-dev ttf-freefont dbus chromium-chromedriver
 tesseract-ocr-data-eng libexif eudev xvfb
-alpine-sdk autoconf automake libtool"
+alpine-sdk autoconf automake libtool font-noto-cjk"
 
 install() {
     local max_retries=3 retry_count=0 cmd="$1" pkg="$2"

@@ -266,10 +266,10 @@ async function sign(cookie, index) {
             { timeout: 30000, waitUntil: 'networkidle' }
         ).catch(() => console.log('❌ ❌ ❌ 执行完成'));
 
-        const main = await page.locator('#outer table.main[width="940"]')
-            .evaluate(el => el.outerHTML)
-            .catch(() => '签到表单未找到');
-        console.log(main)
+        // const main = await page.locator('#outer table.main[width="940"]')
+        //     .evaluate(el => el.outerHTML)
+        //     .catch(() => '签到表单未找到');
+        // console.log(main)
 
         // const token = await page.waitForFunction(() => {
         //     const input = document.querySelector('input[name="cf-turnstile-response"]');
