@@ -23,22 +23,18 @@ chromium.use(stealthPlugin());
 async function injectAdvancedStealth(page) {
     await page.addInitScript(() => {
         try {
-            // navigator.webdriver
             Object.defineProperty(navigator, 'webdriver', { get: () => false });
 
-            // window.chrome
             window.chrome = window.chrome || {};
             window.chrome.runtime = {};
             window.chrome.csi = () => {};
             window.chrome.loadTimes = () => {};
             window.chrome.webstore = {};
 
-            // hardware / memory / languages
             Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
             Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
             Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en-US'] });
 
-            // connection
             Object.defineProperty(navigator, 'connection', {
                 get: () => ({
                     downlink: 10,
@@ -50,7 +46,6 @@ async function injectAdvancedStealth(page) {
                 })
             });
 
-            // plugins & mimeTypes
             const makePlugin = (name, filename, description) => ({ name, filename, description });
             const plugins = [
                 makePlugin('Chrome PDF Plugin', 'internal-pdf-viewer', 'Portable Document Format'),
@@ -70,7 +65,6 @@ async function injectAdvancedStealth(page) {
             mimeArray.namedItem = t => mimeArray.find(m => m.type === t) || null;
             Object.defineProperty(navigator, 'mimeTypes', { get: () => mimeArray });
 
-            // Canvas
             const origGetContext = HTMLCanvasElement.prototype.getContext;
             HTMLCanvasElement.prototype.getContext = function (type, ...args) {
                 const ctx = origGetContext.apply(this, [type, ...args]);
@@ -105,7 +99,6 @@ async function injectAdvancedStealth(page) {
                 return canvas.toDataURL(...args);
             };
 
-            // WebGL
             const proto = WebGLRenderingContext && WebGLRenderingContext.prototype;
             if (proto) {
                 const origGetParam = proto.getParameter;
@@ -120,7 +113,6 @@ async function injectAdvancedStealth(page) {
                 };
             }
 
-            // AudioContext
             const origGetChannelData = AudioBuffer.prototype.getChannelData;
             AudioBuffer.prototype.getChannelData = function () {
                 const data = origGetChannelData.apply(this, arguments);
@@ -129,7 +121,6 @@ async function injectAdvancedStealth(page) {
                 return out;
             };
 
-            // mediaDevices
             if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
                 const origEnum = navigator.mediaDevices.enumerateDevices.bind(navigator.mediaDevices);
                 navigator.mediaDevices.enumerateDevices = async function () {
@@ -144,7 +135,6 @@ async function injectAdvancedStealth(page) {
                 };
             }
 
-            // Fonts
             Object.defineProperty(window, 'FontFace', {
                 value: class FontFace {
                     constructor(family, src) {
@@ -234,8 +224,6 @@ async function sign(cookie, index) {
 
     try {
         await page.goto('/torrents.php', { timeout: 30000 });
-
-        // 这里可做自动化交互：模拟真实用户的鼠标/键盘行为
         await page.mouse.move(100, 100);
         await page.mouse.down();
         await page.mouse.move(200, 200, { steps: 10 });
@@ -266,10 +254,10 @@ async function sign(cookie, index) {
             { timeout: 30000, waitUntil: 'networkidle' }
         ).catch(() => console.log('❌ ❌ ❌ 执行完成'));
 
-        // const main = await page.locator('#outer table.main[width="940"]')
-        //     .evaluate(el => el.outerHTML)
-        //     .catch(() => '签到表单未找到');
-        // console.log(main)
+        const main = await page.locator('#outer table.main[width="940"]')
+            .evaluate(el => el.outerHTML)
+            .catch(() => '签到表单未找到');
+        console.log(main)
 
         // const token = await page.waitForFunction(() => {
         //     const input = document.querySelector('input[name="cf-turnstile-response"]');
@@ -285,7 +273,7 @@ async function sign(cookie, index) {
         //     console.log('❌ Turnstile 未返回 token');
         // }
 
-        const content = await page.content()
+        // const content = await page.content()
         fs.writeFileSync('/tmp/OurBits.html', content);
         // const element = await page.$('form#attendance'); // 选中元素截图
         await page.screenshot({ path: '/tmp/OurBits.png', fullPage: true });

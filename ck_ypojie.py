@@ -23,8 +23,8 @@ class Get:
                     'redirect_to': f'{url}/?cf=1'}
             headers = {'origin': url, 'authority': 'www.ypojie.com'}
             f = s.post(f'{url}/wp-login.php', headers=headers, data=data)
-            name = f.html.search('> Hi, {} <')
-            name = name[0] if name else None
+            match = re.search(r'Hi, (\w+)', f.text)
+            name = match.group(1) if match else None
             if name is None:
                 return (f"<b><span style='color: red'>签到失败</span></b>\n"
                         f"账号{i}登录不成功，用户名或密码可能错误。")

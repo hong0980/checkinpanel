@@ -118,6 +118,7 @@ async function sign(cookie, index) {
 
 async function main() {
     let msgAll = '=== 吾爱破解 签到结果 ===\n';
+    let notifyMsg = '=== 吾爱破解 签到结果 ===\n';
 
     for (let i = 0; i < COOKIES_POJIE.length; i++) {
         const cookie = COOKIES_POJIE[i].cookie;
@@ -128,13 +129,19 @@ async function main() {
         } else {
             signMsg = await sign(cookie, i + 1);
         }
-
         msgAll += `${signMsg}\n-----------------------------------\n\n`;
+        if (!signMsg.includes('签到过了')) {
+            notifyMsg += `${signMsg}\n-----------------------------------\n\n`;
+        }
+
+        if (i < COOKIES_POJIE.length - 1) await magicJS.sleep(3000);
     }
 
-    console.log(msgAll);
+    $.log(msgAll);
     magicJS.done();
-    notify.sendNotify('吾爱破解 签到', msgAll);
+    if (/成功|失败|异常|失效/.test(notifyMsg)) {
+        notify.sendNotify('吾爱破解 签到', notifyMsg);
+    }
 }
 
 main().catch(err => {
