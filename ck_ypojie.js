@@ -4,7 +4,8 @@ cron "1 0,11 * * *" ck_ourbits.js
  */
 
 const utils = require('./utils');
-const $ = new utils.Env('亿破姐 签到');
+const Env = utils.Env;
+const $ = new Env('亿破姐 签到');
 const notify = $.isNode() ? require('./notify') : '';
 const magicJS = utils.MagicJS('亿破姐', 'INFO');
 const COOKIES_YPOJIE = utils.getData().YPOJIE;
