@@ -5,13 +5,11 @@ cron "1 0,11 * * *" ck_ourbits.js
 
 const utils = require('./utils');
 const Env = utils.Env;
-const MagicJS = utils.MagicJS;
-const getData = utils.getData;
 
 const $ = new Env('OurBits 签到');
 const notify = $.isNode() ? require('./notify') : '';
-const magicJS = MagicJS('OurBits', 'INFO');
-const COOKIES_OURBITS = getData().OURBITS;
+const magicJS = utils.MagicJS('OurBits', 'INFO');
+const COOKIES_OURBITS = utils.getData().OURBITS;
 
 const fs = require('fs');
 const path = require('path');

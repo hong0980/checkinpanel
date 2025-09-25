@@ -5,6 +5,7 @@ cron "1 0,11 * * *" ck_ourbits.js
 
 const utils = require('./utils');
 const Env = utils.Env;
+
 const $ = new Env('亿破姐 签到');
 const notify = $.isNode() ? require('./notify') : '';
 const magicJS = utils.MagicJS('亿破姐', 'INFO');
@@ -30,8 +31,8 @@ async function setupBrowser({
 async function getAssets(page) {
     try {
         const content = await page.content()
-        fs.writeFileSync('/tmp/OurBits.html', content);
-        await page.screenshot({ path: '/tmp/OurBits.png', fullPage: true });
+        fs.writeFileSync('/tmp/ypojie.html', content);
+        await page.screenshot({ path: '/tmp/ypojie.png', fullPage: true });
         return await page.locator('table.erphpdown-sc-table:has-text("可用余额")')
             .evaluate(el => el.textContent.trim().replace(/\s+/g, '：'));
     } catch {
@@ -58,14 +59,14 @@ async function sign(username, password, index) {
         }
 
         await page.goto('/vip', opts);
-        // <li style="padding-top:0"><a href="javascript:;" class="usercheck erphpdown-sc-btn active">已签到</a></li>
-        // <li style="padding-top:0"><a href="javascript:;" class="usercheck erphpdown-sc-btn erphp-checkin">今日签到</a></li>
         if ((await page.locator('text=已签到').count()) > 0) {
             return `${magicJS.now()}\n${msgHead}${username} ----\n✅ 今天已经签到过了\n${await getAssets(page)}`;
         }
 
         await page.click('a.erphp-checkin');
         await page.waitForLoadState('networkidle');
+        await magicJS.sleep(2000);
+        await page.reload({ waitUntil: 'networkidle' });
 
         const success = (await page.locator('text=成功').count()) > 0;
         return `${magicJS.now()}\n${msgHead}${username} ----\n${success ? '签到成功 ✅' : '签到失败 ❌'}\n${await getAssets(page)}`;
@@ -83,7 +84,7 @@ async function main() {
     let notifyMsg = msgAll;
 
     for (let i = 0; i < COOKIES_YPOJIE.length; i++) {
-        const { username, password } = COOKIES_YPOJIE[i] || {};
+        const { username, password } = COOKIES_YPOJIE[i] || [];
         const signMsg = (!username || !password)
             ? `账号 ${i + 1}: ❌ Cookie 为空`
             : await sign(username, password, i + 1);
@@ -94,14 +95,13 @@ async function main() {
         if (!signMsg.includes('签到过了')) notifyMsg += formatted;
         if (i < COOKIES_YPOJIE.length - 1) await magicJS.sleep(3000);
     }
-
-    console.log(msgAll);
+    $.log(msgAll);
     magicJS.done();
     if (/成功|失败|异常|失效/.test(notifyMsg)) notify.sendNotify('亿破姐 签到', msgAll);
 }
 
 main().catch(err => {
-    console.error('❌ 脚本异常:', err);
+    $.logErr('❌ 脚本异常:', err);
     process.exit(1);
 });
 
