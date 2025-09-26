@@ -4,15 +4,19 @@ cron: 20 1 0 * * *
 new Env('51黑电子论坛 签到');
 """
 import re, requests
-from utils import get_data
 from notify_mtr import send
+from utils import get_data, today, read, write
 
-class nasyun:
+class hei:
     def __init__(self, check_items):
         self.check_items = check_items
 
     @staticmethod
     def sign(cookie, i):
+        signKey = f"51hei_sign_{i}"
+        if read(signKey) == today():
+            return (f"账号 {i}: ✅ 今日已签到")
+
         session = requests.session()
         url = 'http://www.51hei.com/bbs/home.php?mod=spacecp&ac=credit&op=base'
         headers = {
@@ -29,6 +33,7 @@ class nasyun:
                 return (f"<b><span style='color: red'>签到失败</span></b>\n"
                         f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
+            write(signKey, today())
             pattern = r'<em>\s*(黑币|威望|积分|贡献):\s*</em>(\d+)'
             matches = re.findall(pattern, r.text)
             res = (f"--- {name} 51黑电子论坛 签到结果 ---\n"
@@ -48,8 +53,9 @@ class nasyun:
         return msg_all
 
 if __name__ == "__main__":
-    _data = get_data()
-    _check_items = _data.get("51HEI", [])
-    result = nasyun(check_items=_check_items).main()
-    send("51黑电子论坛 签到", result)
-    # print(result)
+    _check_items = get_data().get("51HEI", [])
+    result = hei(check_items=_check_items).main()
+    if '成功' in result or '失败' in result:
+        send("51黑电子论坛 签到", result)
+    else:
+        print(result)

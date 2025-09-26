@@ -534,7 +534,7 @@ function MagicJS(scriptName = "MagicJS", logLevel = "INFO") {
                 }
                 this.isJSBox || this.isNode ? (data[key] && "object" == typeof data[key] || (data[key] = {}), data[key].hasOwnProperty(session) || (data[key][session] = null), void 0 === val ? delete data[key][session] : data[key][session] = val) : void 0 === val ? delete data[session] : data[session] = val
             } else this.isNode || this.isJSBox ? void 0 === val ? delete data[key] : data[key] = val : data = void 0 === val ? null : val;
-            "object" == typeof data && (data = JSON.stringify(data)), this.isSurge || this.isLoon ? $persistentStore.write(data, key) : this.isQuanX ? $prefs.setValueForKey(data, key) : this.isNode ? this.node.fs.writeFileSync("./magic.json", data) : this.isJSBox && $file.write({
+            "object" == typeof data && (data = JSON.stringify(data, null, 2)), this.isSurge || this.isLoon ? $persistentStore.write(data, key) : this.isQuanX ? $prefs.setValueForKey(data, key) : this.isNode ? this.node.fs.writeFileSync("./magic.json", data) : this.isJSBox && $file.write({
                 data: $data({
                     string: data
                 }),

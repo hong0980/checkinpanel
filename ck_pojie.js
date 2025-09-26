@@ -44,8 +44,7 @@ async function setupBrowser() {
 
 async function sign(cookie, index) {
     const signKey = `pojie_sign_${index}`;
-    let lastDate = magicJS.read(signKey);
-    if (lastDate === magicJS.today()) return `账号 ${index}: ✅ 今日已签到`;
+    if (magicJS.read(signKey) === magicJS.today()) return `账号 ${index}: ✅ 今日已签到`;
 
     let msg = '';
     const msgHead = `---- 账号 ${index}: `;

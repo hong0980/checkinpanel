@@ -4,9 +4,9 @@ cron: 30 1 0 * * *
 new Env('在线工具 签到');
 """
 
-from utils import get_data
+import re, requests
 from notify_mtr import send
-import re, requests, datetime
+from utils import get_data, today, read, write
 
 class ToolLu:
     def __init__(self, check_items):
@@ -14,9 +14,12 @@ class ToolLu:
 
     @staticmethod
     def sign(cookie, i):
+        signKey = f"tool_sign_{i}"
+        if read(signKey) == today():
+            return (f"账号 {i}: ✅ 今日已签到")
         try:
             s = requests.Session()
-            current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+            current_date = today()
             r = s.get('https://id.tool.lu/sign', headers={
                    "cookie": cookie,
                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) "
@@ -36,6 +39,8 @@ class ToolLu:
             points = re.findall(r'>(.*?)<span class="badge bg-warning">(.*?)</span>', c.text)[0]
             last_time = re.findall(rf'<div class="mb-6">(最近签到时间：{current_date}.*?)</div>', r.text)
             color, status, last_time = ('green', '成功', last_time[0]) if last_time else ('red', '失败', '')
+            if last_time:
+                write(signKey, today())
 
             return (f"---- {name} 在线工具 签到结果 ----\n"
                     f"<b><span style='color: {color}'>签到{status}</span></b>\n\n"
@@ -54,8 +59,9 @@ class ToolLu:
         return msg_all
 
 if __name__ == "__main__":
-    _data = get_data()
-    _check_items = _data.get("TOOLU", [])
+    _check_items = get_data().get("TOOLU", [])
     result = ToolLu(check_items=_check_items).main()
-    send("在线工具 签到", result)
-    # print(result)
+    if '成功' in result or '失败' in result:
+        send("在线工具 签到", result)
+    else:
+        print(result)

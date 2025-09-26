@@ -41,8 +41,7 @@ async function getAssets(page) {
 
 async function sign(username, password, index) {
     const signKey = `ypojie_sign_${index}`;
-    let lastDate = magicJS.read(signKey);
-    if (lastDate === magicJS.today()) return `账号 ${index}: ✅ 今日已签到`;
+    if (magicJS.read(signKey) === magicJS.today()) return `账号 ${index}: ✅ 今日已签到`;
 
     const msgHead = `---- 账号 ${index}: `;
     const { browser, page } = await setupBrowser();
