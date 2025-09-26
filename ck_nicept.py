@@ -5,9 +5,9 @@ new Env('NicePT 签到');
 """
 
 import re, time, requests
-from utils import get_data
 from notify_mtr import send
 from datetime import datetime, timedelta
+from utils import get_data, today, read, write
 
 class NicePT:
     def __init__(self, check_items):
@@ -15,6 +15,9 @@ class NicePT:
 
     @staticmethod
     def sign(cookie, i):
+        signKey = f"nicept_sign_{i}"
+        if read(signKey) == today():
+            return (f"账号 {i}: ✅ 今日已签到")
         now, s, headers, msg = datetime.now(), requests.session(), {'Cookie': cookie}, \
             f'<b><span style="color: purple">你今天已经签到了，请勿重复签到</span></b>\n'
         if now.hour == 23 and 57 <= now.minute <= 59:
@@ -37,6 +40,7 @@ class NicePT:
                 msg = (f"<b><span style='color: green'>签到成功。</span></b> "
                        f"{datetime.now().time()}\n{m.group(1)}{m.group(2)}\n"
                        if m and "獲得" in m.group(1) else f"<b><span style='color: red'>签到失败！</span></b>\n")
+                write(signKey, today())
 
             pattern = (r'魔力值.*?:\s*(.*?)\s*<a.*?'
                        r'分享率：</font>\s*(.*?)\s*<font.*?'

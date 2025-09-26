@@ -4,8 +4,8 @@ cron: 10 1 0,15 * * *
 new Env('PTHOME 签到');
 """
 import re, requests
-from utils import get_data
 from notify_mtr import send
+from utils import get_data, today, read, write
 
 class PTHOME:
     def __init__(self, check_items):
@@ -13,6 +13,9 @@ class PTHOME:
 
     @staticmethod
     def sign(cookie, i):
+        signKey = f"pthome_sign_{i}"
+        if read(signKey) == today():
+            return (f"账号 {i}: ✅ 今日已签到")
         session = requests.session()
         headers = {
             "Cookie": cookie,
@@ -42,8 +45,9 @@ class PTHOME:
 
             res = f"---- {name} PTHOME 签到结果 ----\n"
             if "签到成功" in r.text:
+                write(signKey, today())
                 g = re.findall(r'<p>(这是您.*?魔力值。)</p>', r.text)[0]
-                return f"<b><span style='color: green'>签到成功</span></b>\n{g}\n\n{msg}" 
+                return f"<b><span style='color: green'>签到成功</span></b>\n{g}\n\n{msg}"
             elif "抱歉" in r.text:
                 g = re.findall(r'\((签到已得\d+)\)', r.text)[0]
                 return (f"<b><span style='color: green'>您今天已经签到过了，请勿重复刷新。</span></b>"
@@ -62,7 +66,7 @@ class PTHOME:
 
 if __name__ == "__main__":
     result = PTHOME(check_items=get_data().get("PTHOME", [])).main()
-    if '获得' in result or '签到失败' in result or '请求失败' in result:
+    if '获得' in result or '失败' in result:
         send("PTHOME 签到", result)
     else:
         print(result)

@@ -23,8 +23,7 @@ class Get:
 
     def sign_in(self, cookie, i):
         signKey = f"chdbits_sign_{i}"
-        lastDate = read(signKey)
-        if lastDate == today():
+        if read(signKey) == today():
             return (f"账号 {i}: ✅ 今日已签到")
 
         def is_valid_answer(value):

@@ -20,7 +20,9 @@ class HDSky:
     @staticmethod
     def sign(cookie, i):
         signKey = f"hdsky_sign_{i}"
-        lastDate = read(signKey)
+        if read(signKey) == today():
+            return (f"账号 {i}: ✅ 今日已签到")
+
         def fetch_image_hash():
             imagehash = s.post('https://hdsky.me/image_code_ajax.php', headers=headers, data={'action': 'new'}).json().get('code')
             img_response = s.get('https://hdsky.me/image.php', params={'action': 'regimage', 'imagehash': imagehash})
@@ -49,8 +51,6 @@ class HDSky:
             }
 
         try:
-            if lastDate == today():
-                return (f"账号 {i}: ✅ 今日已签到")
             r = s.get(url, headers=headers, verify=False)
             if r.status_code == 200:
                 if "未登录!" in r.text:

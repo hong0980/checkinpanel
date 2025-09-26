@@ -5,9 +5,9 @@ new Env('那是云 签到');
 """
 
 import re, datetime
-from utils import get_data
 from notify_mtr import send
 from requests_html import HTMLSession
+from utils import get_data, today, read, write
 
 class NASYUN:
     def __init__(self, check_items):
@@ -15,6 +15,10 @@ class NASYUN:
 
     @staticmethod
     def sign(cookie, i):
+        signKey = f"nasyun_sign_{i}"
+        if read(signKey) == today():
+            return (f"账号 {i}: ✅ 今日已签到")
+
         url, headers = 'http://www.nasyun.com/home.php', {"Cookie": cookie}
         s, current_date = HTMLSession(), datetime.datetime.now().strftime("%Y-%m-%d")
         sign_msg = "<b><span style='color: red'>签到失败</span></b>\n"
@@ -31,9 +35,11 @@ class NASYUN:
             params.update({'op': 'log', 'suboperation': 'creditrulelog'})
             p = s.get(url, params=params, headers=headers)
 
-            today = re.findall(rf'每天登录.*?(\d+)</td>.*?{current_date}', p.text, re.DOTALL)
-            msg = f"<b><span style='color: green'>签到成功</span></b>\n累计登录：{today[0]} 次\n" \
-                  if today else sign_msg
+            todays = re.findall(rf'每天登录.*?(\d+)</td>.*?{current_date}', p.text, re.DOTALL)
+            msg = f"<b><span style='color: green'>签到成功</span></b>\n累计登录：{todays[0]} 次\n" \
+                  if todays else sign_msg
+            if todays:
+                write(signKey, today())
 
             matches = re.findall(r'(云币|贡献|活跃|积分):\s*</em>(\d+)', f.text)
             res = f"---- {name} 那是云 签到结果 ----\n{msg}\n<b>账户信息</b>\n"
@@ -53,7 +59,7 @@ class NASYUN:
 
 if __name__ == "__main__":
     result = NASYUN(check_items=get_data().get("NASYUN", [])).main()
-    if '成功' in result or '签到失败' in result or '请求失败' in result:
+    if '成功' in result or '失败' in result:
         send("那是云 签到", result)
     else:
         print(result)

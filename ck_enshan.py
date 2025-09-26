@@ -5,9 +5,9 @@ new Env('恩山论坛 签到');
 """
 
 import re, datetime
-from utils import get_data
 from notify_mtr import send
 from requests_html import HTMLSession
+from utils import get_data, today, read, write
 
 class Enshan:
     def __init__(self, check_items):
@@ -15,6 +15,9 @@ class Enshan:
 
     @staticmethod
     def sign(cookie, i):
+        signKey = f"right_sign_{i}"
+        if read(signKey) == today():
+            return (f"账号 {i}: ✅ 今日已签到")
         url, headers, session = 'https://www.right.com.cn/forum/home.php', \
         {"Cookie": cookie,
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
@@ -30,6 +33,8 @@ class Enshan:
 
             r = session.get(url, headers=headers)
             points = re.findall(r'tip="(.*?)">', r.text)
+            if points:
+                write(signKey, today())
             color, status = ('green', '成功') if points else ('red', '失败')
             return (f'---- {name} 恩山论坛 签到结果 ----\n'
                     f"<b><span style='color: {color}'>签到{status}</span></b>\n\n"
@@ -48,5 +53,8 @@ class Enshan:
 
 if __name__ == "__main__":
     result = Enshan(check_items=get_data().get("ENSHAN", [])).main()
-    send("恩山论坛 签到", result)
-    # print(result)
+    if any(x in result for x in ['成功', '失败']):
+        send("恩山论坛 签到", result)
+    else:
+        print(result)
+
