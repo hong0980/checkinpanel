@@ -5,7 +5,7 @@ new Env('V2EX 签到');
 """
 
 import re, time, random, shutil, tempfile
-from utils import get_data
+from utils import get_data, today, read, write
 from notify_mtr import send
 from datetime import datetime
 from selenium import webdriver
@@ -59,6 +59,10 @@ class V2ex:
 
     @staticmethod
     def sign(cookie, i):
+        signKey = f"v2ex_sign_{i}"
+        if read(signKey) == today():
+            return (f"账号 {i}: ✅ 今日已签到")
+
         res, msg = '', ''
         driver, user_data_dir = V2ex.setup_browser()
         try:
@@ -84,6 +88,7 @@ class V2ex:
                 sign_button.click()
                 time.sleep(random.uniform(1.0, 2.0))
                 res = f"{msg}<b><span style='color: green'>签到成功</span></b>"
+                write(signKey, today())
 
             money_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "input[value='查看我的账户余额']"))
@@ -115,12 +120,12 @@ class V2ex:
         return res
 
     def main(self):
-        msg_all = ""
+        messages = []
         for i, check_item in enumerate(self.check_items, start=1):
+            i > 1 and time.sleep(3)
             cookie = check_item.get("cookie")
-            msg = self.sign(cookie, i)
-            msg_all += msg + "\n\n"
-        return msg_all
+            messages.append(self.sign(cookie, i))
+        return "\n\n".join(messages)
 
 if __name__ == "__main__":
     result = V2ex(check_items=get_data().get("V2EX", [])).main()
