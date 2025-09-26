@@ -9,19 +9,24 @@ try:
     import answers
 except ImportError:
     sys.exit(1)
-from utils import get_data
 from notify_mtr import send
 from random import choice, sample
 from fake_useragent import UserAgent
 from requests_html import HTMLSession
 from datetime import datetime, timedelta
+from utils import get_data, today, read, write
 
 class Get:
     def __init__(self, check_items):
         self.session = HTMLSession()
         self.check_items = check_items
 
-    def sign_in(self, cookie, account_index):
+    def sign_in(self, cookie, i):
+        signKey = f"chdbits_sign_{i}"
+        lastDate = read(signKey)
+        if lastDate == today():
+            return (f"账号 {i}: ✅ 今日已签到")
+
         def is_valid_answer(value):
             return value in valid_values if isinstance(value, str) else \
                    any(item in valid_values for item in value) if isinstance(value, list) else False
@@ -41,9 +46,11 @@ class Get:
             'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
         })
 
+        get_response = self.session.get(base_url)
+
         if current_time.hour == 23 and 57 <= current_time.minute <= 59:
             midnight = current_time.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-            wait_seconds = (midnight - current_time).total_seconds() + 50
+            wait_seconds = (midnight - current_time).total_seconds() + 55
             print(f'等待{int(wait_seconds)}秒后执行签到！')
             time.sleep(wait_seconds)
 
@@ -54,67 +61,53 @@ class Get:
                     break
                 print(f'检测到已签到，等待2秒后重试... ({retry+1}/{max_retries})')
                 time.sleep(2)
-        else:
-            import secrets
-            wait_sec = secrets.randbelow(2*3600 + 59*60 + 1)
-            exec_time = current_time + timedelta(seconds=wait_sec)
-            print(f"将在 {exec_time.strftime('%H:%M:%S')} 执行，等待 {wait_sec/3600:.2f} 小时")
-            total_wait = wait_sec
-            while wait_sec > 0:
-                chunk = min(300, wait_sec)
-                time.sleep(chunk)
-                wait_sec -= chunk
-                if wait_sec > 0:
-                    percent = 100 * (total_wait - wait_sec) / total_wait
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 剩余 {wait_sec//60}m {wait_sec%60}s，进度 {percent:.1f}%")
-            get_response = self.session.get(base_url)
 
         try:
             if not (question_id := get_response.html.find('input[name=questionid]', first=True).attrs.get('value')):
-                return f"<b><span style='color: red'>签到失败</span></b>\n账号({account_index})无法登录！可能Cookie失效"
+                return f"<b><span style='color: red'>签到失败</span></b>\n账号({i})无法登录！可能Cookie失效"
 
-            if not '签过到了' in get_response.text:
-                selected_answers = answers.get(question_id)
-                if not (selected_answers and is_valid_answer(selected_answers)):
-                    answer_source = 1 if selected_answers else 2
-                    selected_answers = generate_answer(get_response.text, selected_answers)
+            selected_answers = answers.get(question_id)
+            if not (selected_answers and is_valid_answer(selected_answers)):
+                answer_source = 1 if selected_answers else 2
+                selected_answers = generate_answer(get_response.text, selected_answers)
 
-                data = {
-                    'questionid': question_id, 'choice[]': selected_answers,
-                    'usercomment': '此刻心情:无', 'wantskip': '不会' if wait_seconds else '提交'
-                }
+            data = {
+                'questionid': question_id, 'choice[]': selected_answers,
+                'usercomment': '此刻心情:无', 'wantskip': '不会' if wait_seconds else '提交'
+            }
 
-                current_time_of_day = datetime.now().time()
-                self.session.headers.update({
-                    'Origin': 'https://ptchdbits.co',
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                })
-                post_response = self.session.post(base_url, data=data)
+            current_time_of_day = datetime.now().time()
+            self.session.headers.update({
+                'Origin': 'https://ptchdbits.co',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            })
+            post_response = self.session.post(base_url, data=data)
 
-                question_info = re.findall(r'](\[.选\])\s*?请问：(.*?)</td>', get_response.text)[0]
-                question_table = get_response.html.find('table[border="1"]', first=True)
-                question_text = question_table.find('td')[1].text.strip()
+            question_info = re.findall(r'](\[.选\])\s*?请问：(.*?)</td>', get_response.text)[0]
+            question_table = get_response.html.find('table[border="1"]', first=True)
+            question_text = question_table.find('td')[1].text.strip()
 
-                message = (f'<b><span style="color: orange">题目 {question_id}</span></b>\n'
-                         f'{question_info[0]}：{question_info[1]}\n{question_text}\n\n')
+            message = (f'<b><span style="color: orange">题目 {question_id}</span></b>\n'
+                     f'{question_info[0]}：{question_info[1]}\n{question_text}\n\n')
 
-                answer_method = '使用数值答题'
-                if answer_source:
-                    answer_method = f'{"使用题目答题" if answer_source == 1 else "使用随机答题"}：{selected_answers}'
-                    with open('/ql/data/log/chdbits_非数值答案题目.html.txt', 'a', encoding='utf-8') as f:
-                        f.write('\n'.join(row.html for row in question_table.find('tr')[:2]) + '\n\n')
+            answer_method = '使用数值答题'
+            if answer_source:
+                answer_method = f'{"使用题目答题" if answer_source == 1 else "使用随机答题"}：{selected_answers}'
+                with open('/ql/data/log/chdbits_非数值答案题目.html.txt', 'a', encoding='utf-8') as f:
+                    f.write('\n'.join(row.html for row in question_table.find('tr')[:2]) + '\n\n')
 
-                message += f"<b><span style='color: {'orange' if '数值' in answer_method else 'red'}'>{answer_method}</span></b>\n"
-                message += '\n'.join(
-                    re.sub(r"&nbsp;|&quot;", '',
-                    re.findall(rf"value='{v}'\s*>(.*?)<", get_response.text, re.DOTALL)[0])
-                    for v in selected_answers
-                ) + '\n'
+            message += f"<b><span style='color: {'orange' if '数值' in answer_method else 'red'}'>{answer_method}</span></b>\n"
+            message += '\n'.join(
+                re.sub(r"&nbsp;|&quot;", '',
+                re.findall(rf"value='{v}'\s*>(.*?)<", get_response.text, re.DOTALL)[0])
+                for v in selected_answers
+            ) + '\n'
 
             response_text = post_response.text if post_response else get_response.text
             sign_in_message = re.findall(r'white">(.*?签到.*?)<', response_text)[0]
 
             if '获得' in sign_in_message:
+                write(signKey, today())
                 sign_in_result = f"<b><span style='color: green'>签到成功</span></b> {current_time_of_day}\n"
                 with open('/ql/data/log/chdbits_成功.html.txt', 'w', encoding='utf-8') as f:
                     f.write(post_response.html.html)

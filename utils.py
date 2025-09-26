@@ -4,7 +4,10 @@ import sys
 import tomli
 import traceback
 import utils_env
+import json
+import datetime
 
+_FILE = "magic.json"
 DATA: dict = {}
 
 def _fatal(msg: str) -> None:
@@ -34,3 +37,33 @@ def get_data() -> dict:
         _fatal(f"配置文件格式错误\n参考: https://toml.io/cn/v1.0.0\n{traceback.format_exc()}")
 
     return DATA
+
+def _load():
+    if not os.path.exists(_FILE):
+        return {}
+    try:
+        with open(_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def _save(data):
+    with open(_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def read(key):
+    return _load().get(key)
+
+def write(key, val):
+    data = _load()
+    if val is None:
+        data.pop(key, None)
+    else:
+        data[key] = val
+    _save(data)
+
+def delete(key):
+    write(key, None)
+
+def today():
+    return datetime.date.today().strftime("%Y-%m-%d")

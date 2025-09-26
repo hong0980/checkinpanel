@@ -1,23 +1,24 @@
 /*
- * 吾爱破解
- * cron "2 0,11 * * *" ck_pojie.js
+吾爱破解
+cron "2 0,11 * * *" ck_pojie.js
  */
 
 const utils = require('./utils');
 const notify = require('./notify');
-const $ = new utils.Env('吾爱破解');
+const Env = utils.Env;
+
+const $ = new Env('吾爱破解 签到');
 const magicJS = utils.MagicJS('吾爱破解', 'INFO');
 const COOKIES_POJIE = utils.getData().POJIE;
-const path = require('path');
-const fs = require('fs').promises;
+
+const fs = require('fs');
+// const { rimraf } = require('rimraf');
 const { chromium } = require('playwright');
 
-async function setupBrowser(userDataDir) {
-    const browser = await chromium.launchPersistentContext(userDataDir, {
+async function setupBrowser() {
+    const browser = await chromium.launch({
         headless: true,
         ignoreHTTPSErrors: true,
-        javaScriptEnabled: true,
-        baseURL: 'https://www.52pojie.cn/',
         executablePath: '/usr/bin/chromium-browser',
         args: [
             '--no-sandbox',
@@ -26,93 +27,69 @@ async function setupBrowser(userDataDir) {
             '--disable-dev-shm-usage',
             '--disable-software-rasterizer',
             '--disable-blink-features=AutomationControlled'
-        ],
+        ]
+    });
+
+    const context = await browser.newContext({
+        baseURL: 'https://www.52pojie.cn',
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         extraHTTPHeaders: {
             'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        },
-        viewport: { width: 1280, height: 720 },
+        }
     });
 
-    await browser.addInitScript(() => {
-        Object.defineProperty(navigator, 'webdriver', { get: () => false });
-        Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
-        delete window.debugger;
-
-        const originalSetTimeout = window.setTimeout;
-        window.setTimeout = function (cb, timeout) {
-            if (typeof cb === 'function' && cb.toString().includes('debugger')) return;
-            if (typeof cb === 'string' && cb.includes('debugger')) return;
-            return originalSetTimeout.call(this, cb, timeout);
-        };
-
-        const originalSetInterval = window.setInterval;
-        window.setInterval = function (cb, timeout) {
-            if (typeof cb === 'function' && cb.toString().includes('debugger')) return;
-            if (typeof cb === 'string' && cb.includes('debugger')) return;
-            return originalSetInterval.call(this, cb, timeout);
-        };
-    });
-
-    return browser;
+    return { browser, context };
 }
 
 async function sign(cookie, index) {
-    const userDataDir = '/tmp/pw_user_data';
-    const context = await setupBrowser(userDataDir);
-    const msgHead = `---- 账号 ${index}: `;
-    let msg = '';
+    const signKey = `pojie_sign_${index}`;
+    let lastDate = magicJS.read(signKey);
+    if (lastDate === magicJS.today()) return `账号 ${index}: ✅ 今日已签到`;
 
+    let msg = '';
+    const msgHead = `---- 账号 ${index}: `;
+    const opts = { waitUntil: 'networkidle', timeout: 20000 };
+    const { browser, context } = await setupBrowser();
+    const page = await context.newPage();
     const cookies = cookie.split('; ').map(c => {
         const [name, value] = c.split('=');
-        return { name, value, domain: 'www.52pojie.cn', path: '/', sameSite: 'Lax' };
+        return { name, value, domain: '.52pojie.cn', path: '/', sameSite: 'Lax' };
     });
     await context.addCookies(cookies);
 
-    const opts = { waitUntil: 'networkidle', timeout: 20000 };
-
     try {
-        const page = context.pages()[0] || await context.newPage();
         await page.goto('/forum.php', opts);
-
         const [upmine, integral, username] = await Promise.allSettled([
             page.locator('#g_upmine').textContent({ timeout: 2000 }),
             page.locator('#extcreditmenu').textContent({ timeout: 2000 }),
             page.locator('strong.vwmy a[href*="uid="]').textContent({ timeout: 2000 })
         ]).then(r => r.map(x => x.status === 'fulfilled' ? x.value : null));
 
-        if (!upmine && !username)
-            return `${msgHead}❌ Cookie 可能失效，请重新获取`;
+        if (!username) return `${msgHead}❌ Cookie 可能失效，请重新获取`;
 
         msg = `${msgHead}${username} ----\n`;
 
-        const signLink = await page
-            .locator('#um a[href^="home.php?mod=task&do=apply&id=2"]')
-            .getAttribute('href', { timeout: 1500 })
-            .catch(() => null);
+        const task = await page.$('#um a[href*="mod=task&do=apply&id=2"]');
+        if (task) {
+            const taskLink = await task.getAttribute('href');
+            await page.goto(taskLink, opts);
+            await magicJS.sleep(2000);
+            await page.goto('/forum.php', opts);
+        }
 
-        if (!signLink)
-            return `${msg}✅ 今天已经签到过了\n积分: ${integral} | 威望: ${upmine}`;
-
-        await page.goto(signLink, opts);
-        await magicJS.sleep(3000);
-        await page.goto('/forum.php', opts);
-
-        const signed = await page
-            .waitForSelector('a[href*="mod=task&do=apply&id=2"]', { state: 'detached', timeout: 1000 })
-            .then(() => true)
-            .catch(() => false);
-
+        const signed = await page.locator('#um a[href*="mod=task&do=apply&id=2"]').count() === 0;
         msg += `${magicJS.today()} ${signed ? '✅ 签到成功' : '❌ 签到失败'}\n积分: ${integral} | 威望: ${upmine}`;
+        if (signed) magicJS.write(signKey, magicJS.today());
+        const content = await page.content()
+        fs.writeFileSync('/tmp/52pojie.html', content);
+        await page.screenshot({ path: '/tmp/52pojie.png', fullPage: true });
 
     } catch (err) {
         msg += `❌ 异常: ${err.message}`;
     } finally {
-        await context.close().catch(() => {});
-        await fs.rm(userDataDir, { recursive: true, force: true }).catch(() => {});
+        await browser.close().catch(() => {});
     }
-
     return msg;
 }
 
@@ -139,9 +116,7 @@ async function main() {
 
     $.log(msgAll);
     magicJS.done();
-    if (/成功|失败|异常|失效/.test(notifyMsg)) {
-        notify.sendNotify('吾爱破解 签到', notifyMsg);
-    }
+    if (/成功|失败|异常|失效/.test(notifyMsg)) notify.sendNotify('吾爱破解 签到', notifyMsg);
 }
 
 main().catch(err => {

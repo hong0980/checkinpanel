@@ -12,7 +12,7 @@ const magicJS = utils.MagicJS('亿破姐', 'INFO');
 const COOKIES_YPOJIE = utils.getData().YPOJIE;
 
 const fs = require('fs');
-const { rimraf } = require('rimraf');
+// const { rimraf } = require('rimraf');
 const { chromium } = require('playwright');
 
 async function setupBrowser({
@@ -30,8 +30,7 @@ async function setupBrowser({
 
 async function getAssets(page) {
     try {
-        const content = await page.content()
-        fs.writeFileSync('/tmp/ypojie.html', content);
+        fs.writeFileSync('/tmp/ypojie.html', await page.content());
         await page.screenshot({ path: '/tmp/ypojie.png', fullPage: true });
         return await page.locator('table.erphpdown-sc-table:has-text("可用余额")')
             .evaluate(el => el.textContent.trim().replace(/\s+/g, '：'));
@@ -41,34 +40,34 @@ async function getAssets(page) {
 }
 
 async function sign(username, password, index) {
+    const signKey = `ypojie_sign_${index}`;
+    let lastDate = magicJS.read(signKey);
+    if (lastDate === magicJS.today()) return `账号 ${index}: ✅ 今日已签到`;
+
     const msgHead = `---- 账号 ${index}: `;
-    const opts = { waitUntil: 'networkidle', timeout: 20000 };
     const { browser, page } = await setupBrowser();
+    const opts = { waitUntil: 'networkidle', timeout: 20000 };
 
     try {
         await page.goto('/wp-login.php', opts);
         await page.fill('#user_login', username);
         await page.fill('#user_pass', password);
         await Promise.all([
-            page.waitForNavigation({ waitUntil: 'networkidle' }),
+            page.waitForNavigation(opts),
             page.click('#wp-submit')
         ]);
 
-        if ((await page.locator(`text=${username}`).count()) === 0) {
-            return `${msgHead} ❌ 登录不成功，用户名或密码可能错误。 ----`;
-        }
+        if (!(await page.locator(`text=${username}`).isVisible()))
+            return `${msgHead}❌ 登录失败，用户名或密码错误`;
 
         await page.goto('/vip', opts);
-        if ((await page.locator('text=已签到').count()) > 0) {
-            return `${magicJS.now()}\n${msgHead}${username} ----\n✅ 今天已经签到过了\n${await getAssets(page)}`;
-        }
-
-        await page.click('a.erphp-checkin');
+        await page.locator('a.erphp-checkin').click().catch(() => {});
         await page.waitForLoadState('networkidle');
-        await magicJS.sleep(2000);
-        await page.reload({ waitUntil: 'networkidle' });
+        await page.reload(opts);
 
-        const success = (await page.locator('text=成功').count()) > 0;
+        const success = await page.locator('text=已签到').isVisible();
+        if (success) magicJS.write(signKey, magicJS.today());
+
         return `${magicJS.now()}\n${msgHead}${username} ----\n${success ? '签到成功 ✅' : '签到失败 ❌'}\n${await getAssets(page)}`;
 
     } catch (err) {

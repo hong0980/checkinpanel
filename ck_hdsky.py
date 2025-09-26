@@ -5,7 +5,7 @@ new Env('HDSky 签到');
 """
 
 from io import BytesIO
-from utils import get_data
+from utils import get_data, today, read, write
 from notify_mtr import send
 import re, time, pytesseract, urllib3
 from requests_html import HTMLSession
@@ -19,6 +19,8 @@ class HDSky:
 
     @staticmethod
     def sign(cookie, i):
+        signKey = f"hdsky_sign_{i}"
+        lastDate = read(signKey)
         def fetch_image_hash():
             imagehash = s.post('https://hdsky.me/image_code_ajax.php', headers=headers, data={'action': 'new'}).json().get('code')
             img_response = s.get('https://hdsky.me/image.php', params={'action': 'regimage', 'imagehash': imagehash})
@@ -47,51 +49,53 @@ class HDSky:
             }
 
         try:
+            if lastDate == today():
+                return (f"账号 {i}: ✅ 今日已签到")
             r = s.get(url, headers=headers, verify=False)
             if r.status_code == 200:
                 if "未登录!" in r.text:
                     return (f"<b><span style='color: red'>签到失败</span></b>\n"
                             f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-                if not '[已签到]' in r.text:
-                    while count < max_count:
-                        imagehash, img_response = fetch_image_hash()
-                        imagestring = recognize_captcha_text(img_response)
+                while count < max_count:
+                    imagehash, img_response = fetch_image_hash()
+                    imagestring = recognize_captcha_text(img_response)
 
-                        short_imagehash = f"{imagehash[:3]}...{imagehash[-3:]}"
-                        if imagestring:
-                            print(f"识别到 {short_imagehash} 验证码: {imagestring}，执行第 {count + 1} 次签到。")
-                            data = {'action': 'showup', 'imagehash': imagehash, 'imagestring': imagestring}
-                            response = s.post('https://hdsky.me/showup.php', headers=headers, data=data)
-                            if response.status_code == 200:
-                                p = response.json()
-                                success, message = p.get('success'), p.get('message')
+                    short_imagehash = f"{imagehash[:3]}...{imagehash[-3:]}"
+                    if imagestring:
+                        print(f"识别到 {short_imagehash} 验证码: {imagestring}，执行第 {count + 1} 次签到。")
+                        data = {'action': 'showup', 'imagehash': imagehash, 'imagestring': imagestring}
+                        response = s.post('https://hdsky.me/showup.php', headers=headers, data=data)
+                        if response.status_code == 200:
+                            p = response.json()
+                            success, message = p.get('success'), p.get('message')
 
-                                if success == True:
-                                    msg = "<b><span style='color: green'>签到成功</span></b>\n"
-                                    cg_msg = (f"执行 {count + 1} 次\n已连续签到 {int((message - 10) / 2 + 1)} 天，"
-                                              f"奖励 {message} 魔力值，明日继续签到可获得 {message + 2} 魔力值")
-                                    r = s.get(url, headers=headers)
-                                    break
-                                elif message == 'date_unmatch':
-                                    break
-                                elif message == 'invalid_imagehash':
-                                    count += 1
-                                    if count != max_count:
-                                        print(f"验证码错误。5 秒后重新获取验证，尝试重新签到。")
-                                        time.sleep(5)
-                                    else:
-                                        msg = "<b><span style='color: red'>签到失败</span></b>\n"
-                                        cg_msg = f"验证码错误。已经尝试 {max_count} 次签到，稍后再试。"
-                                        print(cg_msg)
+                            if success == True:
+                                write(signKey, today())
+                                msg = "<b><span style='color: green'>签到成功</span></b>\n"
+                                cg_msg = (f"执行 {count + 1} 次\n已连续签到 {int((message - 10) / 2 + 1)} 天，"
+                                          f"奖励 {message} 魔力值，明日继续签到可获得 {message + 2} 魔力值")
+                                r = s.get(url, headers=headers)
+                                break
+                            elif message == 'date_unmatch':
+                                break
+                            elif message == 'invalid_imagehash':
+                                count += 1
+                                if count != max_count:
+                                    print(f"验证码错误。5 秒后重新获取验证，尝试重新签到。")
+                                    time.sleep(5)
                                 else:
-                                    cg_msg = f"失败，信息：{message if message else '未知'}"
+                                    msg = "<b><span style='color: red'>签到失败</span></b>\n"
+                                    cg_msg = f"验证码错误。已经尝试 {max_count} 次签到，稍后再试。"
                                     print(cg_msg)
                             else:
-                                msg = "<b><span style='color: red'>签到请求失败，无法签到</span></b>\n"
+                                cg_msg = f"失败，信息：{message if message else '未知'}"
+                                print(cg_msg)
                         else:
-                            print(f"识别到 {short_imagehash} 的验证码不符合要求。5 秒后重新获取验证。")
-                            time.sleep(5)
+                            msg = "<b><span style='color: red'>签到请求失败，无法签到</span></b>\n"
+                    else:
+                        print(f"识别到 {short_imagehash} 的验证码不符合要求。5 秒后重新获取验证。")
+                        time.sleep(5)
 
                 pattern = (r'InsaneUser_Name\'><b>(.*?)</b>.*?'
                            r'使用</a>]: (.*?)\s*'
