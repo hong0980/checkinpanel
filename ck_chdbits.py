@@ -49,11 +49,11 @@ class Get:
 
         if current_time.hour == 23 and 57 <= current_time.minute <= 59:
             midnight = current_time.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-            wait_seconds = (midnight - current_time).total_seconds() + 55
+            wait_seconds = (midnight - current_time).total_seconds() + 60
             print(f'等待{int(wait_seconds)}秒后执行签到！')
             time.sleep(wait_seconds)
 
-            max_retries = 10
+            max_retries = 12
             for retry in range(max_retries):
                 get_response = self.session.get(base_url)
                 if '今天已经签过到了' not in get_response.text:

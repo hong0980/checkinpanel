@@ -38,7 +38,25 @@ async function setupBrowser() {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         }
     });
+    await context.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => false });
+        Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+        delete window.debugger;
 
+        const originalSetTimeout = window.setTimeout;
+        window.setTimeout = function (cb, timeout) {
+            if (typeof cb === 'function' && cb.toString().includes('debugger')) return;
+            if (typeof cb === 'string' && cb.includes('debugger')) return;
+            return originalSetTimeout.call(this, cb, timeout);
+        };
+
+        const originalSetInterval = window.setInterval;
+        window.setInterval = function (cb, timeout) {
+            if (typeof cb === 'function' && cb.toString().includes('debugger')) return;
+            if (typeof cb === 'string' && cb.includes('debugger')) return;
+            return originalSetInterval.call(this, cb, timeout);
+        }
+    });
     return { browser, context };
 }
 

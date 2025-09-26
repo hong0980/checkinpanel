@@ -63,7 +63,7 @@ class V2ex:
         if read(signKey) == today():
             return (f"账号 {i}: ✅ 今日已签到")
 
-        res, msg = '', ''
+        res = msg = ''
         driver, user_data_dir = V2ex.setup_browser()
         try:
             driver.get('https://www.v2ex.com/signin')
@@ -74,8 +74,7 @@ class V2ex:
             driver.get('https://www.v2ex.com/mission/daily')
 
             if '注册' in driver.page_source:
-                res = f'账号({i})无法登录！可能Cookie失效，请重新修改'
-                return
+                return f'账号({i})无法登录！可能Cookie失效，请重新修改'
 
             sign_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[type="button"]'))
@@ -83,7 +82,6 @@ class V2ex:
             name_element = driver.find_element(By.CSS_SELECTOR, '.bigger a')
             msg = f"----账号 {i} {name_element.text} V2EX 签到状态 ----\n"
 
-            res = f"{msg}<b><span style='color: green'>今天已经签到过了</span></b>"
             if '领取 X 铜币' in sign_button.get_attribute('value'):
                 sign_button.click()
                 time.sleep(random.uniform(1.0, 2.0))
