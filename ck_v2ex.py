@@ -11,7 +11,6 @@ from datetime import datetime
 from selenium import webdriver
 from fake_useragent import UserAgent
 from selenium_stealth import stealth
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -22,20 +21,27 @@ class V2ex:
         self.check_items = check_items
 
     @staticmethod
-    def setup_browser():
+    def setup_browser(data_dir):
         options = webdriver.ChromeOptions()
-        user_data_dir = tempfile.mkdtemp(prefix="selenium_chrome_")
         options.add_argument("--no-sandbox")
         options.add_argument("--headless=new")
         options.add_argument("--disable-dev-shm-usage")
-        options.add_argument(f"--user-data-dir={user_data_dir}")
+        options.add_argument(f"--user-data-dir={data_dir}")
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
 
-        driver = webdriver.Chrome(
-            options=options,
-            service=Service('/usr/bin/chromedriver')
-        )
+        service = webdriver.ChromeService()
+        service.executable_path='/usr/bin/chromedriver'
+        service.service_args = [
+            # '--verbose',                    # 详细日志
+            # '--append-log',                 # 如需追加日志
+            '--readable-timestamp',         # 可读时间
+            '--enable-chrome-logs',         # 启用 Chrome 内部日志
+            '--log-path=/tmp/V2ex.log'
+        ]
+
+        driver = webdriver.Chrome(options=options, service=service)
+
         stealth(driver,
             platform="Win32",
             fix_hairline=True,
@@ -55,7 +61,7 @@ class V2ex:
         except Exception:
             pass
 
-        return driver, user_data_dir
+        return driver
 
     @staticmethod
     def sign(cookie, i):
@@ -63,8 +69,9 @@ class V2ex:
         if read(signKey) == today():
             return (f"账号 {i}: ✅ 今日已签到")
 
-        res = msg = ''
-        driver, user_data_dir = V2ex.setup_browser()
+        res = ''
+        data_dir = tempfile.mkdtemp(prefix="selenium_chrome_")
+        driver = V2ex.setup_browser(data_dir)
         try:
             driver.get('https://www.v2ex.com/signin')
 
@@ -80,12 +87,12 @@ class V2ex:
                 EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[type="button"]'))
             )
             name_element = driver.find_element(By.CSS_SELECTOR, '.bigger a')
-            msg = f"----账号 {i} {name_element.text} V2EX 签到状态 ----\n"
+            res = f"----账号 {i} {name_element.text} V2EX 签到状态 ----\n"
 
             if '领取 X 铜币' in sign_button.get_attribute('value'):
                 sign_button.click()
                 time.sleep(random.uniform(1.0, 2.0))
-                res = f"{msg}<b><span style='color: green'>签到成功</span></b>"
+                res += f"<b><span style='color: green'>签到成功</span></b>\n"
                 write(signKey, today())
 
             money_button = WebDriverWait(driver, 10).until(
@@ -98,23 +105,23 @@ class V2ex:
             formatted_date = datetime.now().strftime('%Y%m%d')
             gray = re.findall(f'{formatted_date}.*?(每日登录奖励.*?)</span>', driver.page_source)
             money = driver.find_element(By.CSS_SELECTOR, "#money .balance_area").text.replace('\n', '').strip()
-            res += f"\n{cell}\n{gray[0]}\n当前账户余额：{money} 铜币"
+            res += f"{cell}\n{gray[0]}\n当前账户余额：{money} 铜币"
 
-            # with open(f"/tmp/v2ex_{i}.html", "w", encoding="utf-8") as f:
-            #     f.write(driver.page_source)
-            # driver.save_screenshot(f"/tmp/v2ex_{i}.png")
+            with open(f"/tmp/v2ex_{i}.html", "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            driver.save_screenshot(f"/tmp/v2ex_{i}.png")
 
         except TimeoutException as e:
-            res = f"{msg}<b><span style='color: red'>超时异常：</span></b>\n{e}"
+            res = f"{res}<b><span style='color: red'>超时异常：</span></b>\n{e}"
         except NoSuchElementException as e:
-            res = f"{msg}<b><span style='color: red'>签到失败：</span></b>\n{e}"
+            res = f"{res}<b><span style='color: red'>签到失败：</span></b>\n{e}"
         except WebDriverException as e:
-            res = f"{msg}<b><span style='color: red'>WebDriver异常：</span></b>\n{e}"
+            res = f"{res}<b><span style='color: red'>WebDriver异常：</span></b>\n{e}"
         except Exception as e:
-            res = f"{msg}<b><span style='color: red'>未知异常：</span></b>\n{e}"
+            res = f"{res}<b><span style='color: red'>未知异常：</span></b>\n{e}"
         finally:
             driver.quit()
-            shutil.rmtree(user_data_dir, ignore_errors=True)
+            shutil.rmtree(data_dir, ignore_errors=True)
         return res
 
     def main(self):

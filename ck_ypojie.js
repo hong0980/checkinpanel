@@ -48,11 +48,11 @@ async function sign(username, password, index) {
     const opts = { waitUntil: 'networkidle', timeout: 20000 };
 
     try {
-        await page.goto('/wp-login.php', opts);
+        await page.goto('/wp-login.php');
         await page.fill('#user_login', username);
         await page.fill('#user_pass', password);
         await Promise.all([
-            page.waitForNavigation(opts),
+            page.waitForNavigation(),
             page.click('#wp-submit')
         ]);
 

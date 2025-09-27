@@ -4,10 +4,9 @@ cron: 45 58 15,23 * * *
 new Env('NicePT 签到');
 """
 
-import re, time, requests
+import re, requests
 from notify_mtr import send
-from datetime import datetime, timedelta
-from utils import get_data, today, read, write
+from utils import get_data, now, today, read, write, wait_midnight
 
 class NicePT:
     def __init__(self, check_items):
@@ -16,30 +15,33 @@ class NicePT:
     @staticmethod
     def sign(cookie, i):
         signKey = f"nicept_sign_{i}"
-        if read(signKey) == today():
+        if read(signKey) == today(tomorrow_if_late=True):
             return (f"账号 {i}: ✅ 今日已签到")
-        now, s, headers, msg = datetime.now(), requests.session(), {'Cookie': cookie}, \
-            f'<b><span style="color: purple">你今天已经签到了，请勿重复签到</span></b>\n'
-        if now.hour == 23 and 57 <= now.minute <= 59:
-            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-            sleep_seconds = (midnight - now).total_seconds()
-            print(f'等待{int(sleep_seconds)}秒后执行签到！')
-            time.sleep(sleep_seconds)
 
-        r = s.get(f'https://www.nicept.net/torrents.php', headers=headers)
+        msg = f'<b><span style="color: purple">你今天已经签到了，请勿重复签到</span></b>\n'
+        s = requests.session()
+        s.headers.update({
+            'Cookie': cookie, 'accept-language': 'zh-CN,zh;q=0.9',
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+        })
+        wait_midnight()
+
+        r = s.get(f'https://www.nicept.net/torrents.php')
         if r.status_code == 200:
             name = re.findall(r"class='NexusMaster_Name'><b>(.*?)</b>", r.text)
             name = name[0] if name else None
             if name is None:
-                return (f"<b><span style='color: red'>签到失败</span></b>\n"
+                return (f"<b><span style='color: red'>签到失败！</span></b>\n"
                         f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
             if '[簽到得魔力]' in r.text:
-                r = s.get(f'https://www.nicept.net/attendance.php', headers=headers)
-                m = re.search(r'<p>(這是您的第.*?個魔力值。).*?(今日簽到排名：.*?)</span>', r.text)
+                s.headers.update({'referer': 'https://www.nicept.net/torrents.php'})
+                r = s.get(f'https://www.nicept.net/attendance.php')
+                p = re.search(r'<p>(這是您的第.*?個魔力值。).*?(今日簽到排名：.*?)</span>', r.text)
                 msg = (f"<b><span style='color: green'>签到成功。</span></b> "
-                       f"{datetime.now().time()}\n{m.group(1)}{m.group(2)}\n"
-                       if m and "獲得" in m.group(1) else f"<b><span style='color: red'>签到失败！</span></b>\n")
+                       f"{now()}\n{p.group(1)}{p.group(2)}\n"
+                       if p and "獲得" in p.group(1) else f"<b><span style='color: red'>签到失败！</span></b>\n")
                 write(signKey, today())
 
             pattern = (r'魔力值.*?:\s*(.*?)\s*<a.*?'
@@ -48,12 +50,13 @@ class NicePT:
                        r'下載量：</font>\s*(.*?)\s*<font.*?'
                        r'當前做種.*?>(\d+)\s*<img')
             m = re.search(pattern, r.text, re.DOTALL)
-            msg += (f'\n<b>账户信息：</b>\n'
-                    f'魔力值：{m.group(1)}\n'
-                    f'分享率：{m.group(2)}\n'
-                    f'上传量：{m.group(3)}\n'
-                    f'下载量：{m.group(4)}\n'
-                    f'当前做种：{m.group(5)}')
+            if m is not None:
+                msg += (f'\n<b>账户信息：</b>\n'
+                        f'魔力值：{m.group(1)}\n'
+                        f'分享率：{m.group(2)}\n'
+                        f'上传量：{m.group(3)}\n'
+                        f'下载量：{m.group(4)}\n'
+                        f'当前做种：{m.group(5)}')
 
             return f"---- {name} NicePT 签到结果 ----\n{msg}"
         else:

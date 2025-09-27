@@ -8,7 +8,7 @@ import re, time
 from notify_mtr import send
 from requests_html import HTMLSession
 from datetime import datetime, timedelta
-from utils import get_data, today, read, write
+from utils import get_data, today, read, write, wait_midnight
 
 class gebi1:
     def __init__(self, check_items):
@@ -17,19 +17,13 @@ class gebi1:
     @staticmethod
     def sign(cookie, i):
         signKey = f"gebi1_sign_{i}"
-        if read(signKey) == today():
+        if read(signKey) == today(tomorrow_if_late=True):
             return (f"账号 {i}: ✅ 今日已签到")
+
         url = 'https://www.gebi1.com/plugin.php?id=k_misign:sign'
-        def countdown():
-            now = datetime.now()
-            if now.hour == 23 and 57 <= now.minute <= 59:
-                midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-                sleep_seconds = (midnight - now).total_seconds()
-                print(f'等待{int(sleep_seconds)}秒后执行签到！')
-                time.sleep(sleep_seconds)
+        wait_midnight()
 
         try:
-            countdown()
             with HTMLSession() as s:
                 s.cookies.set('Cookie', cookie)
                 r = s.get(url)
