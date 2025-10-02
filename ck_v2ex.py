@@ -127,14 +127,15 @@ class V2ex:
     def main(self):
         messages = []
         for i, check_item in enumerate(self.check_items, start=1):
-            i > 1 and time.sleep(3)
+            if i > 1:
+                time.sleep(3)
             cookie = check_item.get("cookie")
             messages.append(self.sign(cookie, i))
         return "\n\n".join(messages)
 
 if __name__ == "__main__":
     result = V2ex(check_items=get_data().get("V2EX", [])).main()
-    if '签到成功' in result:
+    if re.search(r'成功|失败|异常|错误|登录', result):
         send("V2EX 签到", result)
     else:
         print(result)

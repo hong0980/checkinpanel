@@ -96,8 +96,14 @@ async function sign(cookie, index) {
         }
 
         const signed = await page.locator('#um a[href*="mod=task&do=apply&id=2"]').count() === 0;
-        msg += `${magicJS.today()} ${signed ? '✅ 签到成功' : '❌ 签到失败'}\n积分: ${integral} | 威望: ${upmine}`;
-        if (signed) magicJS.write(signKey, magicJS.today());
+        if (signed) {
+            magicJS.write(signKey, magicJS.today())
+            msg += `${magicJS.today()} '✅ 签到成功'\n`;
+        } else {
+            msg += `${magicJS.today()} '❌ 签到失败'\n`;
+        }
+        msg += `积分: ${integral} | 威望: ${upmine}`
+
         const content = await page.content()
         fs.writeFileSync('/tmp/52pojie.html', content);
         await page.screenshot({ path: '/tmp/52pojie.png', fullPage: true });

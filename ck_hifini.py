@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 45 58 15,23 * * *
+cron: 45 58 23,11 * * *
 new Env('HIFITI 签到');
 """
 
@@ -18,8 +18,9 @@ def hifiti_sign(cookies, i):
     message = "<b><span style='color: red'>签到失败/span></b>"
     session = HTMLSession()
     session.headers.update({
-        'cookie': cookies,
-        "accept": "application/json, text/javascript, */*; q=0.01",
+        'cookie': cookies, 'accept-language': 'zh-CN,zh;q=0.9',
+        'referer': 'https://www.hifiti.com/sg_sign.htm',
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
     })
 
@@ -32,6 +33,7 @@ def hifiti_sign(cookies, i):
 
     session.headers.update({
         'origin': url, 'referer': url,
+        'accept': 'text/plain, */*; q=0.01',
         'x-requested-with': 'XMLHttpRequest',
     })
     p = session.post(f'{url}sg_sign.htm')
