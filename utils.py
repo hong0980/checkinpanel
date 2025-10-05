@@ -131,7 +131,15 @@ def read(key=None, default=None):
 
 def write(key, val):
     data = _load()
-    _set_nested(data, key.split("."), val)
+    keys = key.split(".")
+    cur = data
+    for k in keys[:-1]:
+        cur = cur.setdefault(k, {})
+
+    if isinstance(cur.get(keys[-1]), dict) and isinstance(val, dict):
+        cur[keys[-1]].update(val)
+    else:
+        cur[keys[-1]] = val
     _save(data)
 
 def delete(key):

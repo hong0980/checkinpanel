@@ -18,8 +18,7 @@ def hifiti_sign(cookies, i):
     message = "<b><span style='color: red'>签到失败/span></b>"
     session = HTMLSession()
     session.headers.update({
-        'cookie': cookies, 'accept-language': 'zh-CN,zh;q=0.9',
-        'referer': 'https://www.hifiti.com/sg_sign.htm',
+        'cookie': cookies,
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
     })

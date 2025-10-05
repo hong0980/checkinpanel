@@ -1,5 +1,5 @@
 """
-cron: 39 17 * * *
+cron: 39 8,17 * * *
 new Env('什么值得买签到')
 """
 import requests.exceptions
