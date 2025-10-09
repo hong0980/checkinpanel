@@ -1,6 +1,6 @@
 """
 cron: 10 6,18 * * *
-new Env('阿里云盘');
+new Env('阿里云盘  签到');
 """
 
 import time, re
