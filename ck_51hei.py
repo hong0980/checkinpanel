@@ -33,13 +33,14 @@ class hei:
                 return (f"<b><span style='color: red'>签到失败</span></b>\n"
                         f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-            write(signKey, today())
             pattern = r'<em>\s*(黑币|威望|积分|贡献):\s*</em>(\d+)'
             matches = re.findall(pattern, r.text)
             res = (f"--- {name} 51黑电子论坛 签到结果 ---\n"
                    f"<b><span style='color: green'>签到成功</span></b>\n\n"
                    f"<b>账户信息</b>\n")
             res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
+            if '成功' in res:
+                write(signKey, today())
 
         except Exception as e:
             return f"发生异常: {e}"

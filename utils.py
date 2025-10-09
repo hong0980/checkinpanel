@@ -2,19 +2,65 @@
 
 from itertools import count
 from requests import Response
-import tomli, traceback,utils_env
-import os, sys, json, time, re, urllib.parse
 from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
+import os, sys, json, time, re, urllib.parse, utils_env, tomllib, tomlkit
 
-DATA: dict = {}
-_FILE = "magic.json"
+DATA = {}
+DATA_PATH = ""
+
+def _fatal(msg: str) -> None:
+    """统一错误处理"""
+    print(msg)
+    sys.exit(1)
+
+def get_data() -> dict:
+    """获取全局 TOML 配置（带缓存）"""
+    global DATA, DATA_PATH
+    if DATA:
+        return DATA
+
+    # 获取配置文件路径
+    if check_config := os.getenv("CHECK_CONFIG"): #获取环境变量 CHECK_CONFIG
+        if not os.path.exists(check_config):
+            _fatal(f"错误：环境变量指定的配置文件 {check_config} 不存在！")
+    else:
+        if not (check_config := utils_env.get_file_path("check.toml")):
+            _fatal("错误：未找到配置文件，请创建或设置 CHECK_CONFIG")
+
+    DATA_PATH = check_config
+    with open(check_config, "rb") as f:
+        DATA = tomllib.load(f)
+    DATA["__path__"] = check_config
+    return DATA
+
+def update_data(table_name: str, match_field: str, match_value: str, updates: dict, path: str):
+    """更新 [[table]] 表中匹配的项"""
+    with open(path, "r", encoding="utf-8") as f:
+        doc = tomlkit.parse(f.read())
+
+    if table_name not in doc:
+        _fatal(f"配置文件中未找到 [[{table_name}]]")
+
+    updated = False
+    for item in doc[table_name]:
+        if item.get(match_field) == match_value:
+            for k, v in updates.items():
+                item[k] = v
+            updated = True
+            break
+
+    if not updated:
+        new_item = tomlkit.table()
+        new_item.update({match_field: match_value, **updates})
+        doc[table_name].append(new_item)
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(tomlkit.dumps(doc))
 
 class HookedAdapter(HTTPAdapter):
     _counter = count(1)
-
     def send(self, request, **kwargs):
-        # 给这次请求分配一个序号
         request._hook_id = next(HookedAdapter._counter)
 
         parsed_url = urllib.parse.urlparse(request.url)
@@ -32,8 +78,53 @@ class HookedAdapter(HTTPAdapter):
         flat_params = {k: v[0] if len(v) == 1 else v for k, v in query_params.items()}
         print(f"\n🔗 ========== 请求 #{req_id} ==========")
         print(f"➡️ 发送请求: {request.method} {request.url}")
-        print(f"📝 请求参数:\n{json.dumps(flat_params, indent=2, ensure_ascii=False)}")
+        if flat_params:
+            print(f"📝 请求参数:\n{json.dumps(flat_params, indent=2, ensure_ascii=False)}")
         print(f"📦 请求头:\n{json.dumps(dict(request.headers), indent=2, ensure_ascii=False)}")
+
+        body = request.body
+        content_type = request.headers.get("Content-Type", "").lower()
+        if not body:
+            return
+
+        content = None
+
+        try:
+            if "application/json" in content_type:
+                if isinstance(body, (bytes, bytearray)):
+                    body = body.decode("utf-8", errors="replace")
+                parsed_body = json.loads(body)
+                content = json.dumps(parsed_body, indent=2, ensure_ascii=False)
+
+            elif "application/x-www-form-urlencoded" in content_type:
+                if isinstance(body, (bytes, bytearray)):
+                    body = body.decode("utf-8", errors="replace")
+                parsed_qs = urllib.parse.parse_qs(body)
+                flat_form = {k: v[0] if len(v) == 1 else v for k, v in parsed_qs.items()}
+                content = json.dumps(flat_form, indent=2, ensure_ascii=False)
+
+            elif "multipart/form-data" in content_type:
+                content = "<multipart/form-data> 文件上传内容已省略"
+
+            elif "text/" in content_type or "xml" in content_type:
+                if isinstance(body, bytes):
+                    body = body.decode("utf-8", errors="replace")
+                content = body
+
+            else:
+                if isinstance(body, bytes):
+                    content = f"<{len(body)} bytes>"
+                else:
+                    content = str(body)
+
+        except Exception as e:
+            content = f"<无法解析请求体: {e}>"
+
+        if content:
+            content = content.strip()
+            if len(content) > 1000:
+                content = content[:1000] + "\n...(已截断)"
+            print(f"📨 请求体:\n{content}")
 
     def _response_hook(self, response: Response, cost: float, req_id: int):
         print(f"\n📥 ========== 响应 #{req_id} ==========")
@@ -50,7 +141,6 @@ class HookedAdapter(HTTPAdapter):
         content = content.strip()
         if len(content) > 1500:
             content = content[:1500].strip() + "\n...(已截断)"
-
         print(f"📄 响应数据:\n{content}")
 
         if response.status_code >= 400:
@@ -58,40 +148,14 @@ class HookedAdapter(HTTPAdapter):
 
 def setup_hooks(session):
     try:
-        session.mount('http://', HookedAdapter())
-        session.mount('https://', HookedAdapter())
+        session.mount("http://", HookedAdapter())
+        session.mount("https://", HookedAdapter())
         return True
     except Exception as e:
         print(f"设置钩子失败: {str(e)}")
         return False
 
-def _fatal(msg: str) -> None:
-    """统一错误处理"""
-    print(msg)
-    sys.exit(1)
-
-def get_data() -> dict:
-    """获取签到配置"""
-    global DATA
-    if DATA:
-        return DATA
-
-    # 获取配置文件路径
-    if check_config := os.getenv("CHECK_CONFIG"): #获取环境变量 CHECK_CONFIG
-        if not os.path.exists(check_config):
-            _fatal(f"错误：环境变量指定的配置文件 {check_config} 不存在！")
-    else:
-        if not (check_config := utils_env.get_file_path("check.toml")):
-            _fatal("错误：未找到配置文件，请创建或设置 CHECK_CONFIG")
-
-    # 加载配置文件
-    try:
-        with open(check_config, "rb") as f:
-            DATA = tomli.load(f)
-    except tomli.TOMLDecodeError:
-        _fatal(f"配置文件格式错误\n参考: https://toml.io/cn/v1.0.0\n{traceback.format_exc()}")
-
-    return DATA
+_FILE = "magic.json"
 
 def _load():
     if os.path.exists(_FILE):
@@ -172,7 +236,7 @@ def wait_midnight(**kwargs):
     stime   = kwargs.get('stime', 2)
     wait    = kwargs.get('wait', True)
     offset  = kwargs.get('offset', 0)
-    retries = kwargs.get('retries', 15)
+    retries = kwargs.get('retries', 20)
     base_url = kwargs.get('base_url', '')
     session = kwargs.get('session', None)
 

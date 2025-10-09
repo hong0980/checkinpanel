@@ -39,7 +39,7 @@ class ToolLu:
             points = re.findall(r'>(.*?)<span class="badge bg-warning">(.*?)</span>', c.text)[0]
             last_time = re.findall(rf'<div class="mb-6">(最近签到时间：{current_date}.*?)</div>', r.text)
             color, status, last_time = ('green', '成功', last_time[0]) if last_time else ('red', '失败', '')
-            if last_time:
+            if '成功' in status:
                 write(signKey, today())
 
             return (f"---- {name} 在线工具 签到结果 ----\n"

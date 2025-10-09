@@ -63,14 +63,11 @@ class Cloud189:
     def userlogin(self, username, password, phone_masked):
         try:
             headers = self.headers
-            base_url = "https://cloud.189.cn/api/portal/unifyLoginForPC.action"
-            params = {
-                "appId": self.appId, "clientType": 10020, "timeStamp": self.rand,
-                "returnURL": "https://m.cloud.189.cn/zhuanti/2020/loginErrorPc/index.html"
-            }
+            uurl = 'https://cloud.189.cn/api/portal/unifyLoginForPC.action?' \
+                    f'appId={self.appId}&clientType=10020&timeStamp={self.rand}&' \
+                    'returnURL=https://m.cloud.189.cn/zhuanti/2020/loginErrorPc/index.html'
 
-            resp = self.session.get(base_url, params=params, headers=headers)
-
+            resp = self.session.get(uurl, headers=headers)
             lt = re.search(r'lt = "(.+?)"', resp.text).group(1)
             paramId = re.search(r'paramId = "(.+?)"', resp.text).group(1)
             return_url = re.search(r"returnUrl = '(.+?)'", resp.text).group(1)
@@ -99,21 +96,20 @@ class Cloud189:
             login_url = "https://open.e.189.cn/api/logbox/oauth2/loginSubmit.do"
             resp = self.session.post(login_url, headers=headers, data=data).json()
 
-            toUrl = resp.get("toUrl")
             data = {
                 "version": "6.2",
                 "rand": self.rand,
                 "appId": self.appId,
-                "redirectURL": toUrl,
                 "clientType": "TELEPC",
-                "channelId": "web_cloud.189.cn"
+                "channelId": "web_cloud.189.cn",
+                "redirectURL": resp.get("toUrl")
             }
             surl = "https://api.cloud.189.cn/getSessionForPC.action"
             resp = self.session.post(surl, headers=headers, data=data).json()
 
             sessionKey = resp.get("sessionKey")
-            accessToken = resp.get("accessToken", '')
             refreshToken = resp.get("refreshToken")
+            accessToken = resp.get("accessToken", '')
             if not (accessToken or sessionKey):
                 print(f"{phone_masked} 用户名密码登录失败")
                 return False
@@ -133,7 +129,6 @@ class Cloud189:
             resp = self.session.get(url, headers=headers)
             if resp.json().get("accessToken"):
                 print(f"{phone_masked} 用户名密码登录成功")
-                print(resp.json().get('expiresIn'))
                 write(phone_masked, {"expiresIn": resp.json().get("expiresIn")})
                 return sessionKey
             return False
@@ -146,12 +141,11 @@ class Cloud189:
         try:
             accessToken = read(f"{phone_masked}.accessToken", "")
             refreshToken = read(f"{phone_masked}.refreshToken", "")
-            if not (accessToken or refreshToken):
+            if not any([accessToken, refreshToken]):
                 return False
 
-            if refreshToken and not accessToken:
-                accessToken = self.refresh_access_token(refreshToken, phone_masked)
-                if not accessToken:
+            if not accessToken and refreshToken:
+                if not (accessToken := self.refresh_access_token(refreshToken, phone_masked)):
                     return None
 
             url = "https://api.cloud.189.cn/getSessionForPC.action"
@@ -193,13 +187,12 @@ class Cloud189:
         try:
             self.session.headers.clear()
             headers = self.headers
-            url = (
-                f"https://cloud.189.cn/api/portal/mkt/userSign.action?rand={self.rand}&"
-                f"clientType=TELEANDROID&version=9.0.6&model=KB2000&sessionKey={sessionKey}"
-            )
+            url = 'https://cloud.189.cn/api/portal/mkt/userSign.action?' \
+                  f'model=KB2000&rand={self.rand}&version=9.0.6&' \
+                  f'sessionKey={sessionKey}&clientType=TELEANDROID'
             headers.update({"referer": "https://cloud.189.cn/web/main/"})
-            response = self.session.get(url, headers=headers).json()
 
+            response = self.session.get(url, headers=headers).json()
             netdiskbonus = response.get("netdiskBonus")
             if response.get("isSign") == False:
                 iso_str = response.get("signTime")
@@ -209,7 +202,7 @@ class Cloud189:
                 write(signKey, today())
                 msg += f"{sign_in_result}获得 {netdiskbonus}M 空间"
 
-            url = "https://m.cloud.189.cn/v2/drawPrizeMarketDetails.action?taskId=TASK_SIGNIN&activityId=ACT_SIGNIN"
+            url = 'https://m.cloud.189.cn/v2/drawPrizeMarketDetails.action?taskId=TASK_SIGNIN&activityId=ACT_SIGNIN'
             response = self.session.get(url).json()
             if "errorCode" in response:
                 msg +=  f"\n抽奖: 获得 {response.get('errorCode')}"
@@ -217,31 +210,38 @@ class Cloud189:
                 prize = response.get('prizeName') or response.get('description', '未知奖品')
                 msg +=  f"\n抽奖: 获得 {prize}"
 
-            url = f"https://cloud.189.cn/api/portal/getUserSizeInfo.action?{sessionKey}"
-            response = self.session.get(url, headers=headers)
             try:
-                size_data = response.json()
+                url = f"https://cloud.189.cn/api/portal/getUserSizeInfo.action?sessionKey={sessionKey}"
+                size_data = self.session.get(url, headers=headers).json()
                 total_size = size_data.get("totalSize", 0)
                 cloud_info = size_data.get("cloudCapacityInfo", {})
                 family_info = size_data.get("familyCapacityInfo", {})
-                def format_size(bytes):
-                    if bytes >= 1024 **4:
-                        return f"{bytes / (1024**4):.2f} TB"
-                    elif bytes >= 1024** 3:
-                        return f"{bytes / (1024 **3):.2f} GB"
-                    else:
-                        return f"{bytes / (1024** 2):.2f} MB"
+                def fm_size(size, precision=2):
+                    try:
+                        size = float(size)
+                    except (TypeError, ValueError):
+                        return "0 B"
+
+                    if size < 0:
+                        return "0 B"
+
+                    units = ["B", "KB", "MB", "GB", "TB"]
+                    for unit in units:
+                        if size < 1024 or unit == "TB":
+                            text = f"{size:.{precision}f}".rstrip("0").rstrip(".")
+                            return f"{text} {unit}"
+                        size /= 1024
 
                 size_lines =  [
-                    f"\n\n总空间: {format_size(total_size)}",
+                    f"\n\n总空间: {fm_size(total_size)}",
                     "\n📦 个人容量",
-                    f"\n  个人总容量: {format_size(cloud_info.get('totalSize', 0))}",
-                    f"\n  个人已用: {format_size(cloud_info.get('usedSize', 0))}",
-                    f"\n  个人剩余: {format_size(cloud_info.get('freeSize', 0))}",
+                    f"\n  个人总容量: {fm_size(cloud_info.get('totalSize', 0))}",
+                    f"\n  个人已用: {fm_size(cloud_info.get('usedSize', 0))}",
+                    f"\n  个人剩余: {fm_size(cloud_info.get('freeSize', 0))}",
                     "\n\n👨‍👩‍👧‍👦 家庭容量",
-                    f"\n  家庭总容量: {format_size(family_info.get('totalSize', 0))}",
-                    f"\n  家庭已用: {format_size(family_info.get('usedSize', 0))}",
-                    f"\n  家庭剩余: {format_size(family_info.get('freeSize', 0))}"
+                    f"\n  家庭总容量: {fm_size(family_info.get('totalSize', 0))}",
+                    f"\n  家庭已用: {fm_size(family_info.get('usedSize', 0))}",
+                    f"\n  家庭剩余: {fm_size(family_info.get('freeSize', 0))}"
                 ]
                 msg += ''.join(size_lines)
 

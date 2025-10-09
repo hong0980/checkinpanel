@@ -71,7 +71,6 @@ class CHDBits:
             post_response = self.session.post(base_url, data=data)
             sign_in_message = re.findall(r'white">(.*?签到.*?)<', post_response.text)[0]
             if '获得' in sign_in_message:
-                write(signKey, today())
                 sign_in_result = f"<b><span style='color: green'>签到成功</span></b>  {current_now}\n"
                 with open('/ql/data/log/chdbits_成功.html.txt', 'w', encoding='utf-8') as f:
                     f.write(post_response.html.html)
@@ -105,6 +104,8 @@ class CHDBits:
                 r'做种积分: </font>\s*?(.*?)<',
                 post_response.text, re.DOTALL
             )[0]
+            if re.search(r'成功|签过到了', sign_in_message):
+                write(signKey, today())
 
             return (
                 f"--- {user_info[0]} CHDBits 签到结果 ---\n{sign_in_result}"
