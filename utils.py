@@ -279,6 +279,7 @@ def wait_midnight(**kwargs):
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] "
                       f"剩余 {rm_min}分 {rm_sec}秒，进度 {percent:.1f}%")
 
+    r = None
     if session and base_url:
         for retry in range(retries):
             r = session.get(base_url)
@@ -287,4 +288,4 @@ def wait_midnight(**kwargs):
             print(f'检测到已签到，等待{stime}秒后重试... ({retry+1}/{retries})')
             store.sleep(stime)
 
-    return True
+    return r

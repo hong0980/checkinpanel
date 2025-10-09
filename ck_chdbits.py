@@ -11,13 +11,11 @@ except ImportError:
     sys.exit(1)
 from notify_mtr import send
 from random import choice, sample
-from fake_useragent import UserAgent
 from requests_html import HTMLSession
 from utils import get_data, store, wait_midnight
 
 class CHDBits:
     def __init__(self, check_items):
-        self.session = HTMLSession()
         self.check_items = check_items
 
     def sign_in(self, cookie, i):
@@ -35,19 +33,22 @@ class CHDBits:
             return sample(valid_values, 3) if '[多选]' in html_content else choice(valid_values)
 
         answer_source = None
+        session = HTMLSession()
         answer_method = '使用数值答题'
         valid_values = ('1', '2', '4', '8')
         base_url = 'https://ptchdbits.co/bakatest.php'
         sign_in_result = "<b><span style='color: red'>签到失败</span></b>\n"
 
-        self.session.headers.update({
-            'Cookie': cookie, 'Referer': base_url, 'User-Agent': UserAgent().chrome,
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-            'Accept-Language': 'zh-CN,zh;q=0.9',
+        session.headers.update({
+            'Cookie': cookie, 'Referer': 'https://ptchdbits.co/torrents.php',
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36"
         })
 
-        wait_midnight(session=self.session, base_url=base_url, offset=60, wait=True, stime=2)
-        get_response = self.session.get(base_url)
+        get_response = wait_midnight(
+            offset=60, wait=True, # 开启0点
+            stime=2, retries=20, # 重试次数
+            session=session, base_url=base_url
+        ) or session.get(base_url)
 
         try:
             if not (question_id := get_response.html.find('input[name=questionid]', first=True).attrs.get('value')):
@@ -63,12 +64,12 @@ class CHDBits:
                 'usercomment': '此刻心情:无', 'wantskip': '不会'
             }
 
-            self.session.headers.update({
+            session.headers.update({
                 'Origin': 'https://ptchdbits.co',
                 'Content-Type': 'application/x-www-form-urlencoded'
             })
             current_now = store.now()
-            post_response = self.session.post(base_url, data=data)
+            post_response = session.post(base_url, data=data)
             sign_in_message = re.findall(r'white">(.*?签到.*?)<', post_response.text)[0]
             if '获得' in sign_in_message:
                 sign_in_result = f"<b><span style='color: green'>签到成功</span></b>  {current_now}\n"
@@ -128,7 +129,7 @@ class CHDBits:
 
 if __name__ == "__main__":
     result = CHDBits(get_data().get("CHDBITS", [])).main()
-    if any(x in result for x in ['签到成功', '签到失败', '未知异常']):
+    if re.search(r'签到成功|签到失败|未知异常', result):
         send("CHDBits 签到", result)
     else:
         print(result)
