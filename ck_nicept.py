@@ -6,7 +6,7 @@ new Env('NicePT 签到');
 
 import re, requests
 from notify_mtr import send
-from utils import get_data, now, today, read, write, wait_midnight
+from utils import get_data, store, wait_midnight
 
 class NicePT:
     def __init__(self, check_items):
@@ -15,7 +15,7 @@ class NicePT:
     @staticmethod
     def sign(cookie, i):
         signKey = f"nicept_sign_{i}"
-        if read(signKey) == today(tomorrow_if_late=True):
+        if store.read(signKey) == store.today(tomorrow_if_late=True):
             return (f"账号 {i}: ✅ 今日已签到")
 
         msg = f'<b><span style="color: purple">你今天已经签到了，请勿重复签到</span></b>\n'
@@ -40,9 +40,9 @@ class NicePT:
                 r = s.get(f'https://www.nicept.net/attendance.php')
                 p = re.search(r'<p>(這是您的第.*?個魔力值。).*?(今日簽到排名：.*?)</span>', r.text)
                 msg = (f"<b><span style='color: green'>签到成功。</span></b> "
-                       f"{now()}\n{p.group(1)}{p.group(2)}\n"
+                       f"{store.now()}\n{p.group(1)}{p.group(2)}\n"
                        if p and "獲得" in p.group(1) else f"<b><span style='color: red'>签到失败！</span></b>\n")
-                write(signKey, today())
+                store.write(signKey, store.today())
 
             pattern = (r'魔力值.*?:\s*(.*?)\s*<a.*?'
                        r'分享率：</font>\s*(.*?)\s*<font.*?'

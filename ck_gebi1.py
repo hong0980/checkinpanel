@@ -4,11 +4,11 @@ cron: 50 58 11,23 * * *
 new Env('隔壁网 签到');
 """
 
-import re, time
+import re
 from notify_mtr import send
+from datetime import datetime
 from requests_html import HTMLSession
-from datetime import datetime, timedelta
-from utils import get_data, today, read, write, wait_midnight
+from utils import get_data, store, wait_midnight
 
 class gebi1:
     def __init__(self, check_items):
@@ -17,7 +17,7 @@ class gebi1:
     @staticmethod
     def sign(cookie, i):
         signKey = f"gebi1_sign_{i}"
-        if read(signKey) == today(tomorrow_if_late=True):
+        if store.read(signKey) == store.today(tomorrow_if_late=True):
             return (f"账号 {i}: ✅ 今日已签到")
 
         url = 'https://www.gebi1.com/plugin.php?id=k_misign:sign'
@@ -42,7 +42,7 @@ class gebi1:
                             f"{msg[0] if msg else '签到成功'}</span></b> {datetime.now().time()}\n")
                 if '成功' in sign_msg:
                     r = s.get(url)
-                    write(signKey, today())
+                    store.write(signKey, store.today())
 
                 credit_info = (f'签到排名：{r.html.find("#qiandaobtnnum")[0].attrs["value"]}\n'
                                f'连续签到：{r.html.find("#lxdays")[0].attrs["value"]} 天\n'

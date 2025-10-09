@@ -5,7 +5,7 @@ new Env('51黑电子论坛 签到');
 """
 import re, requests
 from notify_mtr import send
-from utils import get_data, today, read, write
+from utils import get_data, store
 
 class hei:
     def __init__(self, check_items):
@@ -14,7 +14,7 @@ class hei:
     @staticmethod
     def sign(cookie, i):
         signKey = f"51hei_sign_{i}"
-        if read(signKey) == today():
+        if store.read(signKey) == store.today():
             return (f"账号 {i}: ✅ 今日已签到")
 
         session = requests.session()
@@ -40,7 +40,7 @@ class hei:
                    f"<b>账户信息</b>\n")
             res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
             if '成功' in res:
-                write(signKey, today())
+                store.write(signKey, store.today())
 
         except Exception as e:
             return f"发生异常: {e}"

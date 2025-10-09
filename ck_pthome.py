@@ -5,7 +5,7 @@ new Env('PTHOME 签到');
 """
 import re, requests
 from notify_mtr import send
-from utils import get_data, today, read, write
+from utils import get_data, store
 
 class PTHOME:
     def __init__(self, check_items):
@@ -14,7 +14,7 @@ class PTHOME:
     @staticmethod
     def sign(cookie, i):
         signKey = f"pthome_sign_{i}"
-        if read(signKey) == today():
+        if store.read(signKey) == store.today():
             return (f"账号 {i}: ✅ 今日已签到")
         session = requests.session()
         headers = {
@@ -45,7 +45,7 @@ class PTHOME:
 
             res = f"---- {name} PTHOME 签到结果 ----\n"
             if "签到成功" in r.text:
-                write(signKey, today())
+                store.write(signKey, store.today())
                 g = re.findall(r'<p>(这是您.*?魔力值。)</p>', r.text)[0]
                 return f"<b><span style='color: green'>签到成功</span></b>\n{g}\n\n{msg}"
             elif "抱歉" in r.text:

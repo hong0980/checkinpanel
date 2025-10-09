@@ -5,7 +5,7 @@ new Env('HDSky 签到');
 """
 
 from io import BytesIO
-from utils import get_data, today, read, write
+from utils import get_data, store
 from notify_mtr import send
 import re, time, pytesseract, urllib3
 from requests_html import HTMLSession
@@ -20,7 +20,7 @@ class HDSky:
     @staticmethod
     def sign(cookie, i):
         signKey = f"hdsky_sign_{i}"
-        if read(signKey) == today():
+        if store.read(signKey) == store.today():
             return (f"账号 {i}: ✅ 今日已签到")
 
         def fetch_image_hash():
@@ -71,7 +71,7 @@ class HDSky:
                             success, message = p.get('success'), p.get('message')
 
                             if success == True:
-                                write(signKey, today())
+                                store.write(signKey, store.today())
                                 msg = "<b><span style='color: green'>签到成功</span></b>\n"
                                 cg_msg = (f"执行 {count + 1} 次\n已连续签到 {int((message - 10) / 2 + 1)} 天，"
                                           f"奖励 {message} 魔力值，明日继续签到可获得 {message + 2} 魔力值")

@@ -13,7 +13,7 @@ from notify_mtr import send
 from random import choice, sample
 from fake_useragent import UserAgent
 from requests_html import HTMLSession
-from utils import get_data, now, today, read, write, wait_midnight
+from utils import get_data, store, wait_midnight
 
 class CHDBits:
     def __init__(self, check_items):
@@ -22,7 +22,7 @@ class CHDBits:
 
     def sign_in(self, cookie, i):
         signKey = f"chdbits_sign_{i}"
-        if read(signKey) == today(tomorrow_if_late=True):
+        if store.read(signKey) == store.today(tomorrow_if_late=True):
             return (f"账号 {i}: ✅ 今日已签到")
 
         def is_valid_answer(value):
@@ -67,7 +67,7 @@ class CHDBits:
                 'Origin': 'https://ptchdbits.co',
                 'Content-Type': 'application/x-www-form-urlencoded'
             })
-            current_now = now()
+            current_now = store.now()
             post_response = self.session.post(base_url, data=data)
             sign_in_message = re.findall(r'white">(.*?签到.*?)<', post_response.text)[0]
             if '获得' in sign_in_message:
@@ -105,7 +105,7 @@ class CHDBits:
                 post_response.text, re.DOTALL
             )[0]
             if re.search(r'成功|签过到了', sign_in_message):
-                write(signKey, today())
+                store.write(signKey, store.today())
 
             return (
                 f"--- {user_info[0]} CHDBits 签到结果 ---\n{sign_in_result}"

@@ -7,7 +7,7 @@ from notify_mtr import send
 from datetime import datetime
 import time, hashlib, random, re
 from requests_html import HTMLSession
-from utils import get_data, today, read, write
+from utils import get_data, store
 
 def get_user_info(session):
     try:
@@ -77,7 +77,7 @@ def get_monthly_exp(session):
 
 def sign_in(cookie, i):
     signKey = f"smzdm_sign_{i}"
-    if read(signKey) == today():
+    if store.read(signKey) == store.today():
         return (f"账号 {i}: ✅ 今日已签到")
 
     session = HTMLSession()
@@ -150,7 +150,7 @@ def sign_in(cookie, i):
                      "已签" in signin_msg)
 
         if is_success:
-            write(signKey, today())
+            store.write(signKey, store.today())
         return msg
 
     except requests.exceptions.Timeout:

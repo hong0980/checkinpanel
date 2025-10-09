@@ -7,11 +7,11 @@ new Env('HIFITI 签到');
 import re
 from notify_mtr import send
 from requests_html import HTMLSession
-from utils import get_data, today, read, write, wait_midnight
+from utils import get_data, store, wait_midnight
 
 def hifiti_sign(cookies, i):
     signKey = f"hifiti_sign_{i}"
-    if read(signKey) == today(tomorrow_if_late=True):
+    if store.read(signKey) == store.today(tomorrow_if_late=True):
         return (f"账号 {i}: ✅ 今日已签到")
 
     url = "https://www.hifiti.com/"
@@ -37,7 +37,7 @@ def hifiti_sign(cookies, i):
     })
     p = session.post(f'{url}sg_sign.htm')
     if p.status_code == 200:
-        write(signKey, today())
+        store.write(signKey, store.today())
         message = p.json().get("message")
         r = session.get(url)
         message += f'\n当前{re.findall(r"连续签到.*?天", r.text)[0]}'

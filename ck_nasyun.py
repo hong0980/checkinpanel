@@ -7,7 +7,7 @@ new Env('那是云 签到');
 import re, datetime
 from notify_mtr import send
 from requests_html import HTMLSession
-from utils import get_data, today, read, write
+from utils import get_data, store
 
 class NASYUN:
     def __init__(self, check_items):
@@ -16,7 +16,7 @@ class NASYUN:
     @staticmethod
     def sign(cookie, i):
         signKey = f"nasyun_sign_{i}"
-        if read(signKey) == today():
+        if store.read(signKey) == store.today():
             return (f"账号 {i}: ✅ 今日已签到")
 
         url, headers = 'http://www.nasyun.com/home.php', {"Cookie": cookie}
@@ -39,7 +39,7 @@ class NASYUN:
             msg = f"<b><span style='color: green'>签到成功</span></b>\n累计登录：{todays[0]} 次\n" \
                   if todays else sign_msg
             if todays:
-                write(signKey, today())
+                store.write(signKey, store.today())
 
             matches = re.findall(r'(云币|贡献|活跃|积分):\s*</em>(\d+)', f.text)
             res = f"---- {name} 那是云 签到结果 ----\n{msg}\n<b>账户信息</b>\n"

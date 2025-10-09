@@ -6,7 +6,7 @@ new Env('在线工具 签到');
 
 import re, requests
 from notify_mtr import send
-from utils import get_data, today, read, write
+from utils import get_data, store
 
 class ToolLu:
     def __init__(self, check_items):
@@ -15,11 +15,11 @@ class ToolLu:
     @staticmethod
     def sign(cookie, i):
         signKey = f"tool_sign_{i}"
-        if read(signKey) == today():
+        if store.read(signKey) == store.today():
             return (f"账号 {i}: ✅ 今日已签到")
         try:
             s = requests.Session()
-            current_date = today()
+            current_date = store.today()
             r = s.get('https://id.tool.lu/sign', headers={
                    "cookie": cookie,
                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) "
@@ -40,7 +40,7 @@ class ToolLu:
             last_time = re.findall(rf'<div class="mb-6">(最近签到时间：{current_date}.*?)</div>', r.text)
             color, status, last_time = ('green', '成功', last_time[0]) if last_time else ('red', '失败', '')
             if '成功' in status:
-                write(signKey, today())
+                store.write(signKey, store.today())
 
             return (f"---- {name} 在线工具 签到结果 ----\n"
                     f"<b><span style='color: {color}'>签到{status}</span></b>\n\n"

@@ -6,7 +6,7 @@ new Env('阿里云盘  签到');
 import time, re
 from notify_mtr import send
 from requests_html import HTMLSession
-from utils import today, read, write, get_data, update_data, setup_hooks
+from utils import store, get_data, update_data, setup_hooks
 
 cfg = get_data()
 
@@ -25,7 +25,7 @@ class ALiYun:
             return '', ''
         name = res.get('user_name') or res.get('nick_name') or 'Unknown'
 
-        write('ALiYun', {
+        store.write('ALiYun', {
             name: {
                 'user_id': res['user_id'],
                 'refresh_token': res['refresh_token'],
@@ -98,7 +98,7 @@ class ALiYun:
         if not ok:
             return f"{name} 签到失败：{info}\n"
 
-        write(signKey, today())
+        store.write(signKey, store.today())
         msg = f"--- {name} 阿里云盘 签到结果 ---\n"
         msg += f"本月已签到 {count} 次\n"
         ok, info = self.get_reward(access_token, count)
@@ -115,7 +115,7 @@ class ALiYun:
         )
         for i, (name, acc) in enumerate(items, 1):
             signKey = f"aliyun_sign_{i}"
-            if read(signKey, '') == today():
+            if store.read(signKey, '') == store.today():
                 return f"{msg}✅ 今日已签到"
 
             if i > 1:
@@ -135,8 +135,8 @@ class ALiYun:
         return msg
 
 if __name__ == '__main__':
-    check_items = cfg.get("ALiYun", []) or read('ALiYun')
-    # check_items = read('ALiYun') or get_data().get("ALiYun", [])
+    check_items = cfg.get("ALiYun", []) or store.read('ALiYun')
+    # check_items = store.read('ALiYun') or get_data().get("ALiYun", [])
     result = ALiYun(check_items, use_hooks=False).SignIn()
     if re.search(r'成功|失败|异常|错误|登录', result):
         send("阿里云盘 签到", result)

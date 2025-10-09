@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 from itertools import count
 from requests import Response
 from datetime import datetime, timedelta
@@ -8,6 +7,7 @@ import os, sys, json, time, re, urllib.parse, utils_env, tomllib, tomlkit
 
 DATA = {}
 DATA_PATH = ""
+_FILE = "magic.json"
 
 def _fatal(msg: str) -> None:
     """统一错误处理"""
@@ -21,7 +21,7 @@ def get_data() -> dict:
         return DATA
 
     # 获取配置文件路径
-    if check_config := os.getenv("CHECK_CONFIG"): #获取环境变量 CHECK_CONFIG
+    if check_config := os.getenv("CHECK_CONFIG"):
         if not os.path.exists(check_config):
             _fatal(f"错误：环境变量指定的配置文件 {check_config} 不存在！")
     else:
@@ -35,7 +35,6 @@ def get_data() -> dict:
     return DATA
 
 def update_data(table_name: str, match_field: str, match_value: str, updates: dict, path: str):
-    """更新 [[table]] 表中匹配的项"""
     with open(path, "r", encoding="utf-8") as f:
         doc = tomlkit.parse(f.read())
 
@@ -45,8 +44,7 @@ def update_data(table_name: str, match_field: str, match_value: str, updates: di
     updated = False
     for item in doc[table_name]:
         if item.get(match_field) == match_value:
-            for k, v in updates.items():
-                item[k] = v
+            item.update(updates)
             updated = True
             break
 
@@ -60,6 +58,7 @@ def update_data(table_name: str, match_field: str, match_value: str, updates: di
 
 class HookedAdapter(HTTPAdapter):
     _counter = count(1)
+
     def send(self, request, **kwargs):
         request._hook_id = next(HookedAdapter._counter)
 
@@ -88,7 +87,6 @@ class HookedAdapter(HTTPAdapter):
             return
 
         content = None
-
         try:
             if "application/json" in content_type:
                 if isinstance(body, (bytes, bytearray)):
@@ -112,10 +110,7 @@ class HookedAdapter(HTTPAdapter):
                 content = body
 
             else:
-                if isinstance(body, bytes):
-                    content = f"<{len(body)} bytes>"
-                else:
-                    content = str(body)
+                content = f"<{len(body)} bytes>" if isinstance(body, bytes) else str(body)
 
         except Exception as e:
             content = f"<无法解析请求体: {e}>"
@@ -152,85 +147,103 @@ def setup_hooks(session):
         session.mount("https://", HookedAdapter())
         return True
     except Exception as e:
-        print(f"设置钩子失败: {str(e)}")
+        print(f"设置钩子失败: {e}")
         return False
 
-_FILE = "magic.json"
+class Store:
+    def __init__(self, path=_FILE):
+        self.path = path
 
-def _load():
-    if os.path.exists(_FILE):
-        try:
-            with open(_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
+    def _load(self):
+        if os.path.exists(self.path):
+            try:
+                with open(self.path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except:
+                return {}
+        return {}
 
-def _save(data):
-    with open(_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    def _save(self, data):
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
-def _get_nested(data, keys, default=None):
-    cur = data
-    for k in keys:
-        if not isinstance(cur, dict) or k not in cur:
-            return default
-        cur = cur[k]
-    return cur
+    def _get_nested(self, data, keys, default=None):
+        cur = data
+        for k in keys:
+            if not isinstance(cur, dict) or k not in cur:
+                return default
+            cur = cur[k]
+        return cur
 
-def _set_nested(data, keys, val):
-    cur = data
-    for k in keys[:-1]:
-        cur = cur.setdefault(k, {})
-    if val is None:
+    def _deep_update(self, d, u):
+        for k, v in u.items():
+            if isinstance(v, dict) and isinstance(d.get(k), dict):
+                self._deep_update(d[k], v)
+            else:
+                d[k] = v
+        return d
+
+    def read(self, key=None, default=None):
+        data = self._load()
+        if not key:
+            return data
+        return self._get_nested(data, key.split("."), default)
+
+    def write(self, key, val):
+        data = self._load()
+        keys = key.split(".")
+        cur = data
+        for k in keys[:-1]:
+            cur = cur.setdefault(k, {})
+
+        last = keys[-1]
+        if isinstance(cur.get(last), dict) and isinstance(val, dict):
+            self._deep_update(cur[last], val)
+        else:
+            cur[last] = val
+        self._save(data)
+
+    def delete(self, key):
+        data = self._load()
+        keys = key.split(".")
+        cur = data
+        for k in keys[:-1]:
+            cur = cur.get(k, {})
         cur.pop(keys[-1], None)
-    else:
-        cur[keys[-1]] = val
+        self._save(data)
 
-def read(key=None, default=None):
-    data = _load()
-    if not key:
-        return data
-    return _get_nested(data, key.split("."), default)
+    def update(self, values: dict):
+        data = self._load()
+        for k, v in values.items():
+            keys = k.split(".")
+            cur = data
+            for key in keys[:-1]:
+                cur = cur.setdefault(key, {})
+            cur[keys[-1]] = v
+        self._save(data)
 
-def write(key, val):
-    data = _load()
-    keys = key.split(".")
-    cur = data
-    for k in keys[:-1]:
-        cur = cur.setdefault(k, {})
+    # ======= 时间工具 =======
+    @staticmethod
+    def today(tomorrow_if_late=False, late_hour=23, late_minute=50):
+        now_time = datetime.now()
+        target_date = now_time
+        if tomorrow_if_late:
+            threshold = now_time.replace(hour=late_hour, minute=late_minute, second=0, microsecond=0)
+            if now_time >= threshold:
+                target_date += timedelta(days=1)
+        return target_date.strftime("%Y-%m-%d")
 
-    if isinstance(cur.get(keys[-1]), dict) and isinstance(val, dict):
-        cur[keys[-1]].update(val)
-    else:
-        cur[keys[-1]] = val
-    _save(data)
+    @staticmethod
+    def now():
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-def delete(key):
-    write(key, None)
+    @staticmethod
+    def sleep(seconds):
+        time.sleep(seconds)
 
-def update(values: dict):
-    data = _load()
-    for k, v in values.items():
-        _set_nested(data, k.split("."), v)
-    _save(data)
 
-def today(tomorrow_if_late=False, late_hour=23, late_minute=50):
-    now_time = datetime.now()
-    target_date = now_time
-
-    if tomorrow_if_late:
-        threshold = now_time.replace(hour=late_hour, minute=late_minute, second=0, microsecond=0)
-        if now_time >= threshold:
-            target_date = now_time + timedelta(days=1)
-
-    return target_date.strftime("%Y-%m-%d")
-
-def now():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-def sleep(m):
-    time.sleep(m)
+# 全局单例
+store = Store()
 
 def wait_midnight(**kwargs):
     stime   = kwargs.get('stime', 2)
@@ -257,7 +270,7 @@ def wait_midnight(**kwargs):
                 break
 
             chunk = min(20, sleep_seconds)
-            sleep(chunk)
+            store.sleep(chunk)
 
             sleep_seconds = (target_time - datetime.now()).total_seconds()
             if sleep_seconds > 0:
@@ -272,6 +285,6 @@ def wait_midnight(**kwargs):
             if not re.search(r'今天已经签过到了|已经签到|今日已签', r.text):
                 break
             print(f'检测到已签到，等待{stime}秒后重试... ({retry+1}/{retries})')
-            sleep(stime)
+            store.sleep(stime)
 
     return True

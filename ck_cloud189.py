@@ -8,7 +8,7 @@ from notify_mtr import send
 import re, time, rsa, hashlib
 from datetime import datetime
 from requests_html import HTMLSession
-from utils import today, read, write, now, get_data, setup_hooks
+from utils import store, get_data, setup_hooks
 
 class Cloud189:
     def __init__(self, check_items, use_hooks=False):
@@ -52,7 +52,7 @@ class Cloud189:
                 refreshToken = res.get("refreshToken", '')
                 if accessToken and refreshToken:
                     print(f"{phone_masked} 刷新token成功")
-                    write(phone_masked, {"accessToken": accessToken, "refreshToken": refreshToken})
+                    store.write('cloud189', {phone_masked: {"accessToken": accessToken, "refreshToken": refreshToken}})
                     return accessToken
 
             print(f"token: {resp.json().get('msg')}")
@@ -114,7 +114,7 @@ class Cloud189:
                 print(f"{phone_masked} 用户名密码登录失败")
                 return False
 
-            write(phone_masked, {"accessToken": accessToken, "refreshToken": refreshToken})
+            store.write('cloud189', {phone_masked: {"accessToken": accessToken, "refreshToken": refreshToken}})
             url = f"https://cloud.189.cn/api/open/oauth2/getAccessTokenBySsKey.action?sessionKey={sessionKey}"
             self.session.headers.clear()
             headers = self.headers.copy()
@@ -129,7 +129,7 @@ class Cloud189:
             resp = self.session.get(url, headers=headers)
             if resp.json().get("accessToken"):
                 print(f"{phone_masked} 用户名密码登录成功")
-                write(phone_masked, {"expiresIn": resp.json().get("expiresIn")})
+                store.write('cloud189', {phone_masked: {"expiresIn": resp.json().get("expiresIn")}})
                 return sessionKey
             return False
 
@@ -139,8 +139,8 @@ class Cloud189:
 
     def tokenlogin(self, phone_masked):
         try:
-            accessToken = read(f"{phone_masked}.accessToken", "")
-            refreshToken = read(f"{phone_masked}.refreshToken", "")
+            accessToken = store.read(f"cloud189.{phone_masked}.accessToken", "")
+            refreshToken = store.read(f"cloud189.{phone_masked}.refreshToken", "")
             if not any([accessToken, refreshToken]):
                 return False
 
@@ -174,9 +174,9 @@ class Cloud189:
 
     def sign(self, phone, password, i):
         phone_masked = self.show_contact(phone)
-        msg = f"--- {phone_masked} 天翼云盘签到结果 ---\n{now()}\n"
+        msg = f"--- {phone_masked} 天翼云盘签到结果 ---\n{store.now()}\n"
         signKey = f"189_sign_{i}"
-        if read(signKey, '') == today():
+        if store.read(signKey, '') == store.today():
             return f"{msg}✅ 今日已签到"
 
         sessionKey = self.tokenlogin(phone_masked) or self.userlogin(phone, password, phone_masked)
@@ -199,7 +199,7 @@ class Cloud189:
                 readable_str = datetime.fromisoformat(iso_str).astimezone().strftime("%Y-%m-%d %H:%M:%S")
                 msg += f"获得 {netdiskbonus}M 空间\n签到时间：{readable_str}"
             else:
-                write(signKey, today())
+                store.write(signKey, store.today())
                 msg += f"{sign_in_result}获得 {netdiskbonus}M 空间"
 
             url = 'https://m.cloud.189.cn/v2/drawPrizeMarketDetails.action?taskId=TASK_SIGNIN&activityId=ACT_SIGNIN'
