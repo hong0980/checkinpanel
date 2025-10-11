@@ -6,26 +6,26 @@ from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 import os, sys, json, time, re, urllib.parse, tomllib, tomlkit, fcntl
 
-DATA = {}
-DATA_PATH = ""
-_FILE = "magic.json"
+from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 @contextmanager
-def file_lock(path, mode="r+", lock_type="exclusive", encoding="utf-8", timeout=5, check_interval=0.05):
+def file_lock(path, mode="r+", lock_type="exclusive", timeout=5, check_interval=0.05):
     lock_flag = fcntl.LOCK_EX if lock_type == "exclusive" else fcntl.LOCK_SH
-    f = open(path, mode, encoding=encoding)
+    if not os.path.exists(path) and "r" in mode:
+        mode = "w+"
+    f = open(path, mode, encoding="utf-8")
 
-    start_time = time.time()
+    start = time.time()
     while True:
         try:
             fcntl.flock(f, lock_flag | fcntl.LOCK_NB)
-            break  # 成功锁定
+            break
         except BlockingIOError:
-            if (time.time() - start_time) >= timeout:
+            if (time.time() - start) >= timeout:
                 f.close()
                 raise TimeoutError(f"获取文件锁超时: {path}")
             time.sleep(check_interval)
-
     try:
         yield f
     finally:
@@ -36,6 +36,9 @@ def file_lock(path, mode="r+", lock_type="exclusive", encoding="utf-8", timeout=
             pass
         fcntl.flock(f, fcntl.LOCK_UN)
         f.close()
+
+DATA = {}
+DATA_PATH = ""
 
 def _fatal(msg: str) -> None:
     print(msg)
@@ -66,7 +69,7 @@ def update_data(table_name: str, match_field: str, match_value: str, updates: di
         t.update({match_field: match_value, **updates})
         return t
 
-    with file_lock(path, "r+", "exclusive", timeout=5) as f:
+    with file_lock(path, "r+", "exclusive") as f:
         content = f.read().strip()
         doc = tomlkit.parse(content or "")
         table = doc.get(table_name)
@@ -103,7 +106,7 @@ def update_data(table_name: str, match_field: str, match_value: str, updates: di
         f.write(tomlkit.dumps(doc).strip() + "\n")
 
 class Store:
-    def __init__(self, path=_FILE):
+    def __init__(self, path="magic.json"):
         self.path = path
 
     def _load(self):
@@ -121,7 +124,7 @@ class Store:
 
     def _save(self, data):
         try:
-            with file_lock(self.path, "w", "exclusive", timeout=5) as f:
+            with file_lock(self.path, "w", "exclusive") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             return True
         except TimeoutError as e:
@@ -210,6 +213,117 @@ class Store:
         time.sleep(seconds)
 
 store = Store()
+
+class YamlStore:
+    def __init__(self, path="Cookie.yml"):
+        self.path = path
+        self.yaml = YAML()
+        self.yaml.preserve_quotes = True
+        self.yaml.indent(mapping=2, sequence=4, offset=2)
+
+    def _load(self):
+        if not os.path.exists(self.path):
+            return CommentedMap()
+        try:
+            with file_lock(self.path, "r", "shared"):
+                with open(self.path, "r", encoding="utf-8") as f:
+                    data = self.yaml.load(f) or CommentedMap()
+                    if not isinstance(data, (dict, CommentedMap)):
+                        raise ValueError("YAML 根元素必须是映射类型")
+                    return data
+        except Exception as e:
+            print(f"[YamlStore._load] 读取失败: {e}")
+            return CommentedMap()
+
+    def _save(self, data):
+        try:
+            with file_lock(self.path, "w", "exclusive"):
+                with open(self.path, "w", encoding="utf-8") as f:
+                    self.yaml.dump(data, f)
+            return True
+        except Exception as e:
+            print(f"[YamlStore._save] 写入失败: {e}")
+            return False
+
+    def _get_nested(self, data, keys, default=None):
+        cur = data
+        for k in keys:
+            if isinstance(cur, (list, CommentedSeq)) and k.isdigit():
+                idx = int(k)
+                if idx < len(cur):
+                    cur = cur[idx]
+                else:
+                    return default
+            elif isinstance(cur, (dict, CommentedMap)):
+                cur = cur.get(k)
+            else:
+                return default
+        return cur
+
+    def read(self, key=None, default=None):
+        data = self._load()
+        if not key:
+            return data
+        return self._get_nested(data, key.split("."), default)
+
+    def write(self, key, val):
+        try:
+            data = self._load()
+            keys = key.split(".")
+            cur = data
+            for i, k in enumerate(keys[:-1]):
+                if k.isdigit():
+                    k = int(k)
+                    if not isinstance(cur, (list, CommentedSeq)):
+                        raise TypeError(f"路径 {'.'.join(keys[:i])} 应为列表")
+                    while len(cur) <= k:
+                        cur.append(CommentedMap())
+                    cur = cur[k]
+                else:
+                    if not isinstance(cur, (dict, CommentedMap)):
+                        raise TypeError(f"路径 {'.'.join(keys[:i])} 应为字典")
+                    cur = cur.setdefault(k, CommentedMap())
+
+            last = keys[-1]
+            if isinstance(cur, (list, CommentedSeq)) and last.isdigit():
+                last = int(last)
+                while len(cur) <= last:
+                    cur.append(None)
+                cur[last] = val
+            else:
+                cur[last] = val
+            return self._save(data)
+        except Exception as e:
+            print(f"[YamlStore.write] 写入失败: {e}")
+            return False
+
+    def delete(self, key):
+        data = self._load()
+        keys = key.split(".")
+        cur = data
+        for k in keys[:-1]:
+            if isinstance(cur, (dict, CommentedMap)):
+                cur = cur.get(k, {})
+            elif isinstance(cur, (list, CommentedSeq)) and k.isdigit():
+                idx = int(k)
+                cur = cur[idx] if idx < len(cur) else {}
+            else:
+                return False
+        if isinstance(cur, (dict, CommentedMap)):
+            cur.pop(keys[-1], None)
+        elif isinstance(cur, (list, CommentedSeq)) and keys[-1].isdigit():
+            idx = int(keys[-1])
+            if idx < len(cur):
+                cur.pop(idx)
+        return self._save(data)
+
+    def update(self, values: dict):
+        data = self._load()
+        for k, v in values.items():
+            self.write(k, v)
+        return True
+
+yamlstore = YamlStore()
 
 class HookedAdapter(HTTPAdapter):
     _counter = count(1)
