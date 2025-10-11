@@ -43,8 +43,8 @@ class ToolLu:
                 store.write(signKey, store.today())
 
             return (f"---- {name} 在线工具 签到结果 ----\n"
-                    f"<b><span style='color: {color}'>签到{status}</span></b>\n\n"
-                    f"<b>账户信息</b>\n{consecutive_sign_in}\n{daily_points}\n"
+                    f"<b><span style='color: {color}'>签到{status}</span></b>\n"
+                    f"<br><b>账户信息</b>\n{consecutive_sign_in}\n{daily_points}\n"
                     f"{consecutives}{points[0]}{points[1]}\n{last_time}")
 
         except Exception:

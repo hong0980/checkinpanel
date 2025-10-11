@@ -36,8 +36,8 @@ class hei:
             pattern = r'<em>\s*(黑币|威望|积分|贡献):\s*</em>(\d+)'
             matches = re.findall(pattern, r.text)
             res = (f"--- {name} 51黑电子论坛 签到结果 ---\n"
-                   f"<b><span style='color: green'>签到成功</span></b>\n\n"
-                   f"<b>账户信息</b>\n")
+                   f"<b><span style='color: green'>签到成功</span></b>\n"
+                   f"<br><b>账户信息</b>\n")
             res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
             if '成功' in res:
                 store.write(signKey, store.today())

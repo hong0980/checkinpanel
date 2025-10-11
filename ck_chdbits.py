@@ -12,11 +12,14 @@ except ImportError:
 from notify_mtr import send
 from random import choice, sample
 from requests_html import HTMLSession
-from utils import get_data, store, wait_midnight
+from utils import get_data, setup_hooks, store, wait_midnight
 
 class CHDBits:
-    def __init__(self, check_items):
+    def __init__(self, check_items, use_hooks=True):
         self.check_items = check_items
+        self.session = HTMLSession()
+        if use_hooks:
+            setup_hooks(self.session, truncate=False)
 
     def sign_in(self, cookie, i):
         signKey = f"chdbits_sign_{i}"
@@ -33,22 +36,21 @@ class CHDBits:
             return sample(valid_values, 3) if '[多选]' in html_content else choice(valid_values)
 
         answer_source = None
-        session = HTMLSession()
         answer_method = '使用数值答题'
         valid_values = ('1', '2', '4', '8')
         base_url = 'https://ptchdbits.co/bakatest.php'
         sign_in_result = "<b><span style='color: red'>签到失败</span></b>\n"
 
-        session.headers.update({
-            'Cookie': cookie, 'Referer': 'https://ptchdbits.co/torrents.php',
+        self.session.headers.update({
+            'Cookie': cookie, 'Referer': base_url,
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36"
         })
 
         get_response = wait_midnight(
             offset=60, wait=True, # 开启0点
             stime=2, retries=20, # 重试次数
-            session=session, base_url=base_url
-        ) or session.get(base_url)
+            session=self.session, base_url=base_url
+        ) or self.session.get(base_url)
 
         try:
             if not (question_id := get_response.html.find('input[name=questionid]', first=True).attrs.get('value')):
@@ -60,18 +62,19 @@ class CHDBits:
                 selected_answers = generate_answer(get_response.text, selected_answers)
 
             data = {
-                'questionid': question_id, 'choice[]': selected_answers,
-                'usercomment': '此刻心情:无', 'wantskip': '不会'
+                'usercomment': '此刻心情:无', 'wantskip': '不会',
+                'questionid': question_id, 'choice[]': selected_answers
             }
 
-            session.headers.update({
-                'Origin': 'https://ptchdbits.co',
+            self.session.headers.update({
+                'origin': 'https://ptchdbits.co',
                 'Content-Type': 'application/x-www-form-urlencoded'
             })
             current_now = store.now()
-            post_response = session.post(base_url, data=data)
+            post_response = self.session.post(base_url, data=data)
             sign_in_message = re.findall(r'white">(.*?签到.*?)<', post_response.text)[0]
             if '获得' in sign_in_message:
+                store.write(signKey, store.today())
                 sign_in_result = f"<b><span style='color: green'>签到成功</span></b>  {current_now}\n"
                 with open('/ql/data/log/chdbits_成功.html.txt', 'w', encoding='utf-8') as f:
                     f.write(post_response.html.html)
@@ -105,8 +108,8 @@ class CHDBits:
                 r'做种积分: </font>\s*?(.*?)<',
                 post_response.text, re.DOTALL
             )[0]
-            if re.search(r'成功|签过到了', sign_in_message):
-                store.write(signKey, store.today())
+            # if re.search(r'魔力值|签过到了', sign_in_message):
+            #     store.write(signKey, store.today())
 
             return (
                 f"--- {user_info[0]} CHDBits 签到结果 ---\n{sign_in_result}"
@@ -122,13 +125,16 @@ class CHDBits:
             return f"<b><span style='color: red'>未知异常：</span></b>\n{traceback.format_exc()}"
 
     def main(self):
-        return "\n\n".join(
-            self.sign_in(account.get("cookie"), idx)
-            for idx, account in enumerate(self.check_items, 1)
-        )
+        try:
+            return "\n\n".join(
+                self.sign_in(account.get("cookie"), idx)
+                for idx, account in enumerate(self.check_items, 1)
+            )
+        finally:
+            self.session.close()
 
 if __name__ == "__main__":
-    result = CHDBits(get_data().get("CHDBITS", [])).main()
+    result = CHDBits(get_data().get("CHDBITS", []), use_hooks=False).main()
     if re.search(r'签到成功|签到失败|未知异常', result):
         send("CHDBits 签到", result)
     else:

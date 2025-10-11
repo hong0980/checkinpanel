@@ -111,12 +111,16 @@ class ALiYun:
         items = (
             list(self.check_items.items())
             if isinstance(self.check_items, dict)
-            else [(i['name'], i) for i in self.check_items]
+            else [(acc.get("name") or f"账号{i+1}", acc)
+                  for i, acc in enumerate(self.check_items)]
         )
+
         for i, (name, acc) in enumerate(items, 1):
             signKey = f"aliyun_sign_{i}"
+
             if store.read(signKey, '') == store.today():
-                return f"{msg}✅ 今日已签到"
+                msg += f"{name} ✅ 今日已签到\n"
+                continue
 
             if i > 1:
                 time.sleep(3)
@@ -124,7 +128,7 @@ class ALiYun:
 
             refresh = acc.get("refresh_token")
             if not refresh:
-                msg += f"{name} 缺少 refresh_token，跳过。\n"
+                msg += f"{name} ⚠️ 缺少 refresh_token，跳过。\n"
                 continue
 
             try:
@@ -132,7 +136,7 @@ class ALiYun:
             except Exception as e:
                 msg += f"⚠️ {name} 出现异常：{e}\n"
 
-        return msg
+        return msg.strip()
 
 if __name__ == '__main__':
     check_items = cfg.get("ALiYun", []) or store.read('ALiYun')

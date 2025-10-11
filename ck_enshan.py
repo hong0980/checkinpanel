@@ -37,8 +37,8 @@ class Enshan:
                 store.write(signKey, store.today())
             color, status = ('green', '成功') if points else ('red', '失败')
             return (f'---- {name} 恩山论坛 签到结果 ----\n'
-                    f"<b><span style='color: {color}'>签到{status}</span></b>\n\n"
-                    f'<b>账户信息</b>\n{points[0]}')
+                    f"<b><span style='color: {color}'>签到{status}</span></b>\n"
+                    f'<br><b>账户信息</b>\n{points[0]}')
 
         except Exception:
             import traceback
