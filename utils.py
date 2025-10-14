@@ -10,11 +10,20 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 @contextmanager
-def file_lock(path, mode="r+", lock_type="exclusive", timeout=5, check_interval=0.05):
+def file_lock(path, *args, timeout=5, check_interval=0.05):
+    if len(args) == 2:
+        lock_type = args[1]
+    elif len(args) == 1:
+        lock_type = args[0]
+    else:
+        lock_type = "exclusive"
+
     lock_flag = fcntl.LOCK_EX if lock_type == "exclusive" else fcntl.LOCK_SH
-    if not os.path.exists(path) and "r" in mode:
-        mode = "w+"
-    f = open(path, mode, encoding="utf-8")
+
+    if not os.path.exists(path):
+        open(path, "a", encoding="utf-8").close()
+
+    f = open(path, "r+", encoding="utf-8")
 
     start = time.time()
     while True:
@@ -22,7 +31,7 @@ def file_lock(path, mode="r+", lock_type="exclusive", timeout=5, check_interval=
             fcntl.flock(f, lock_flag | fcntl.LOCK_NB)
             break
         except BlockingIOError:
-            if (time.time() - start) >= timeout:
+            if time.time() - start >= timeout:
                 f.close()
                 raise TimeoutError(f"获取文件锁超时: {path}")
             time.sleep(check_interval)
@@ -109,31 +118,6 @@ class Store:
     def __init__(self, path="magic.json"):
         self.path = path
 
-    def _load(self):
-        if not os.path.exists(self.path):
-            return {}
-        try:
-            with file_lock(self.path, "r", "shared", timeout=3) as f:
-                try:
-                    return json.load(f)
-                except Exception:
-                    return {}
-        except Exception as e:
-            print(f"[store._load] 读取失败: {e}")
-            return {}
-
-    def _save(self, data):
-        try:
-            with file_lock(self.path, "w", "exclusive") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            return True
-        except TimeoutError as e:
-            print(f"[store._save] 超时未能写入: {e}")
-            return False
-        except Exception as e:
-            print(f"[store._save] 写入失败: {e}")
-            return False
-
     def _get_nested(self, data, keys, default=None):
         cur = data
         for k in keys:
@@ -151,58 +135,74 @@ class Store:
         return d
 
     def read(self, key=None, default=None):
-        data = self._load()
-        if not key:
-            return data
-        return self._get_nested(data, key.split("."), default)
-
-    def write(self, key, val):
+        if not os.path.exists(self.path):
+            return {} if key is None else default
         try:
-            data = self._load()
-            keys = key.split(".")
-            cur = data
-            for k in keys[:-1]:
-                cur = cur.setdefault(k, {})
-            last = keys[-1]
+            with file_lock(self.path, "shared", timeout=3) as f:
+                try:
+                    data = json.load(f)
+                except Exception:
+                    data = {}
+        except Exception:
+            data = {}
+        return data if key is None else self._get_nested(data, key.split("."), default)
 
-            if isinstance(cur.get(last), dict) and isinstance(val, dict):
-                self._deep_update(cur[last], val)
-            else:
-                cur[last] = val
-
-            return self._save(data)
-        except Exception as e:
-            print(f"[store.write] 写入失败: {e}")
-            return False
+    def write(self, key, val, retry=5, retry_interval=0.1):
+        for _ in range(retry):
+            try:
+                with file_lock(self.path, "exclusive", timeout=3) as f:
+                    f.seek(0)
+                    try:
+                        data = json.load(f)
+                    except Exception:
+                        data = {}
+                    cur = data
+                    keys = key.split(".")
+                    for k in keys[:-1]:
+                        cur = cur.setdefault(k, {})
+                    last = keys[-1]
+                    if isinstance(cur.get(last), dict) and isinstance(val, dict):
+                        self._deep_update(cur[last], val)
+                    else:
+                        cur[last] = val
+                    f.seek(0)
+                    f.truncate()
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                    return True
+            except Exception:
+                time.sleep(retry_interval)
+        return False
 
     def delete(self, key):
-        data = self._load()
-        keys = key.split(".")
-        cur = data
-        for k in keys[:-1]:
-            cur = cur.get(k, {})
-        cur.pop(keys[-1], None)
-        return self._save(data)
-
-    def update(self, values: dict):
-        data = self._load()
-        for k, v in values.items():
-            keys = k.split(".")
-            cur = data
-            for key in keys[:-1]:
-                cur = cur.setdefault(key, {})
-            cur[keys[-1]] = v
-        return self._save(data)
+        try:
+            with file_lock(self.path, "exclusive", timeout=5) as f:
+                f.seek(0)
+                try:
+                    data = json.load(f)
+                except Exception:
+                    data = {}
+                cur = data
+                keys = key.split(".")
+                for k in keys[:-1]:
+                    cur = cur.get(k, {})
+                cur.pop(keys[-1], None)
+                f.seek(0)
+                f.truncate()
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+                return True
+        except Exception:
+            return False
 
     @staticmethod
     def today(tomorrow_if_late=False, late_hour=23, late_minute=50):
-        now_time = datetime.now()
-        target_date = now_time
-        if tomorrow_if_late:
-            threshold = now_time.replace(hour=late_hour, minute=late_minute, second=0, microsecond=0)
-            if now_time >= threshold:
-                target_date += timedelta(days=1)
-        return target_date.strftime("%Y-%m-%d")
+        now = datetime.now()
+        if tomorrow_if_late and now.hour >= late_hour and now.minute >= late_minute:
+            now += timedelta(days=1)
+        return now.strftime("%Y-%m-%d")
 
     @staticmethod
     def now():

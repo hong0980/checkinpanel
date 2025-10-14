@@ -7,8 +7,12 @@ COMMENT
 
 pl_mods="File::Slurp JSON5 TOML::Dumper"
 alpine_pkgs="py3-pip libffi-dev openssl-dev perl-app-cpanminus perl-dev make"
-py_reqs="cryptography dateparser feedparser peewee requests_html schedule tomlkit lxml_html_clean brotli rsa ruamel.yaml"
-js_pkgs="@iarna/toml @types/node axios@1.7.7 crypto-js console-table-printer@2.12.0 cheerio ds date-fns dotenv download form-data fs global-agent got@11.8.6 https-proxy-agent@7.0.5 js-base64 jsdom md5 moment png-js qrcode-terminal redis@4.7.0 request sharp tough-cookie ts-md5 tslib tunnel ws"
+py_reqs="cryptography dateparser feedparser peewee requests_html schedule
+tomlkit lxml_html_clean brotli rsa ruamel.yaml"
+js_pkgs="@iarna/toml @types/node axios@1.7.7 crypto-js console-table-printer@2.12.0
+cheerio ds date-fns dotenv download form-data fs global-agent got@11.8.6
+https-proxy-agent@7.0.5 js-base64 jsdom md5 moment png-js qrcode-terminal
+redis@4.7.0 request sharp tough-cookie ts-md5 tslib tunnel ws"
 
 install() {
     local max_retries=3 retry_count=0 cmd="$1" pkg="$2"

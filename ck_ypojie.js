@@ -63,8 +63,9 @@ async function sign(username, password, index) {
         await page.locator('a.erphp-checkin').click().catch(() => {});
         await page.waitForLoadState('networkidle');
         await page.reload(opts);
+        await magicJS.sleep(1000);
+        const success = await page.locator('text=已签到').isVisible({ timeout: 2000 });
 
-        const success = await page.locator('text=已签到').isVisible();
         if (success) magicJS.write(signKey, magicJS.today());
 
         return `${magicJS.now()}\n${msgHead}${username} ----\n${success ? '签到成功 ✅' : '签到失败 ❌'}\n${await getAssets(page)}`;
@@ -73,7 +74,6 @@ async function sign(username, password, index) {
         return `${msgHead} ❌ 异常: ${err.message}`;
     } finally {
         await browser.close().catch(() => {});
-        // await rimraf('/tmp/puppeteer_dev*', { glob: true }).catch(() => {});
     }
 }
 

@@ -1,6 +1,6 @@
 """
 cron: 39 8,17 * * *
-new Env('什么值得买签到')
+new Env('什么值得买 签到')
 """
 import requests.exceptions
 from notify_mtr import send
@@ -133,7 +133,7 @@ def sign_in(cookie, i):
 
         monthly_exp = get_monthly_exp(session)
         name, level, gold, silver = get_user_info(session)
-        msg = f"----账号 {i} {name} SMZDM 签到状态 ----\n"
+        msg = f"----账号 {i} {name} 什么值得买 签到状态 ----\n"
         msg += '\n'.join([
             f'等级: VIP{level}',
             f'金币: {gold}',
@@ -172,6 +172,6 @@ def main(account):
 if __name__ == "__main__":
     result = main(get_data().get("SMZDM", []))
     if re.search(r'成功|失败|异常|错误|登录', result):
-        send("SMZDM 签到", result)
+        send("什么值得买 签到", result)
     else:
         print(result)
