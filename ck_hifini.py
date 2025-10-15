@@ -17,33 +17,33 @@ def hifiti_sign(cookies, i):
     url = "https://www.hifiti.com/"
     message = "<b><span style='color: red'>签到失败/span></b>"
     session = HTMLSession()
-    session.headers.update({
+    headers = {
         'cookie': cookies,
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
-    })
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+    }
 
-    r = session.get(url)
+    r = session.get(url, headers=headers)
     name_element = r.html.find('a[href="my.htm"]', first=True)
     if name_element is None:
         return (f"{message}账号({i})无法登录！可能Cookie失效，请重新修改")
 
     wait_midnight()
 
-    session.headers.update({
+    headers.update({
         'origin': url, 'referer': url,
         'accept': 'text/plain, */*; q=0.01',
         'x-requested-with': 'XMLHttpRequest',
     })
-    p = session.post(f'{url}sg_sign.htm')
+    p = session.post(f'{url}sg_sign.htm', headers=headers)
     if p.status_code == 200:
         store.write(signKey, store.today())
         message = p.json().get("message")
-        r = session.get(url)
+        headers.pop('X-Requested-With', None)
+        r = session.get(url, headers=headers)
         message += f'\n当前{re.findall(r"连续签到.*?天", r.text)[0]}'
-    session.headers.pop('X-Requested-With', None)
 
-    f = session.get(f'{url}my-credits.htm')
+    f = session.get(f'{url}my-credits.htm', headers=headers)
     schedule = re.findall(r'<p>(用户组: .*?)</p>', f.text)[0]
     schedule += ' ' + f.html.find('div.progress', first=True).text
     matches = re.findall(r'(经验|金币|人民币).*?value="(\d+)"', f.text)
@@ -64,3 +64,4 @@ if __name__ == "__main__":
         send("HIFITI 签到", result)
     else:
         print(result)
+    # print(result)

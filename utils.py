@@ -1,55 +1,17 @@
 from itertools import count
+from ruamel.yaml import YAML
 from requests import Response
 from tomlkit.items import AoT
-from contextlib import contextmanager
+from filelock import FileLock
 from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
-import os, sys, json, time, re, urllib.parse, tomllib, tomlkit, fcntl
-
-from ruamel.yaml import YAML
+import os, sys, json, time, re, urllib.parse, tomllib, tomlkit
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
-
-@contextmanager
-def file_lock(path, *args, timeout=5, check_interval=0.05):
-    if len(args) == 2:
-        lock_type = args[1]
-    elif len(args) == 1:
-        lock_type = args[0]
-    else:
-        lock_type = "exclusive"
-
-    lock_flag = fcntl.LOCK_EX if lock_type == "exclusive" else fcntl.LOCK_SH
-
-    if not os.path.exists(path):
-        open(path, "a", encoding="utf-8").close()
-
-    f = open(path, "r+", encoding="utf-8")
-
-    start = time.time()
-    while True:
-        try:
-            fcntl.flock(f, lock_flag | fcntl.LOCK_NB)
-            break
-        except BlockingIOError:
-            if time.time() - start >= timeout:
-                f.close()
-                raise TimeoutError(f"获取文件锁超时: {path}")
-            time.sleep(check_interval)
-    try:
-        yield f
-    finally:
-        try:
-            f.flush()
-            os.fsync(f.fileno())
-        except Exception:
-            pass
-        fcntl.flock(f, fcntl.LOCK_UN)
-        f.close()
 
 DATA = {}
 DATA_PATH = ""
 
-def _fatal(msg: str) -> None:
+def _fatal(msg: str):
     print(msg)
     sys.exit(1)
 
@@ -78,53 +40,83 @@ def update_data(table_name: str, match_field: str, match_value: str, updates: di
         t.update({match_field: match_value, **updates})
         return t
 
-    with file_lock(path, "r+", "exclusive") as f:
-        content = f.read().strip()
-        doc = tomlkit.parse(content or "")
-        table = doc.get(table_name)
+    content = open(path, "r", encoding="utf-8").read() if os.path.exists(path) else ""
+    doc = tomlkit.parse(content or "")
+    table = doc.get(table_name)
 
-        if table is None:
-            aot = tomlkit.aot()
-            aot.append(make_item())
-            doc.add(table_name, aot)
+    if table is None:
+        aot = tomlkit.aot()
+        aot.append(make_item())
+        doc.add(table_name, aot)
 
-        elif isinstance(table, AoT):
-            updated = False
-            empty_item = None
-            for item in table:
-                val = str(item.get(match_field, "")).strip().lower()
-                if not val and empty_item is None:
-                    empty_item = item
-                if val == str(match_value).strip().lower():
-                    item.update(updates)
-                    updated = True
-                    break
-            if not updated:
-                if empty_item is not None:
-                    empty_item.update({match_field: match_value, **updates})
-                else:
-                    table.append(make_item())
-        else:
-            aot = tomlkit.aot()
-            aot.append(table)
-            aot.append(make_item())
-            doc[table_name] = aot
+    elif isinstance(table, AoT):
+        updated = False
+        empty_item = None
+        for item in table:
+            val = str(item.get(match_field, "")).strip().lower()
+            if not val and empty_item is None:
+                empty_item = item
+            if val == str(match_value).strip().lower():
+                item.update(updates)
+                updated = True
+                break
 
-        f.seek(0)
-        f.truncate()
+        if not updated:
+            if empty_item is not None:
+                empty_item.update(make_item())
+            else:
+                table.append(make_item())
+
+    else:
+        aot = tomlkit.aot()
+        aot.append(table)
+        aot.append(make_item())
+        doc[table_name] = aot
+
+    with open(path, "w", encoding="utf-8") as f:
         f.write(tomlkit.dumps(doc).strip() + "\n")
 
 class Store:
-    def __init__(self, path="magic.json"):
+    def __init__(self, path="config.json"):
         self.path = path
+        self.is_yaml = False
+        self.lock = FileLock(f"{path}.lock")
+        self.ext = os.path.splitext(path)[1].lower()
 
-    def _get_nested(self, data, keys, default=None):
-        cur = data
-        for k in keys:
-            if not isinstance(cur, dict) or k not in cur:
-                return default
-            cur = cur[k]
-        return cur
+        if self.ext in [".yaml", ".yml"]:
+            self.is_yaml = True
+            self.yaml = YAML()
+            self.yaml.preserve_quotes = True
+            self.yaml.indent(mapping=2, sequence=4, offset=2)
+
+    def _load(self):
+        if not os.path.exists(self.path):
+            return CommentedMap() if self.is_yaml else {}
+
+        try:
+            with open(self.path, "r", encoding="utf-8") as f:
+                if self.is_yaml:
+                    data = self.yaml.load(f) or CommentedMap()
+                    if not isinstance(data, (dict, CommentedMap)):
+                        raise ValueError("YAML 根元素必须是映射类型")
+                else:
+                    data = json.load(f)
+                return data
+        except Exception as e:
+            print(f"[ConfigStore._load] 读取失败: {e}")
+            return CommentedMap() if self.is_yaml else {}
+
+    def _save(self, data):
+        try:
+            with open(self.path, "w", encoding="utf-8") as f:
+                if self.is_yaml:
+                    self.yaml.dump(data, f)
+                else:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            print(f"[ConfigStore._save] 写入失败: {e}")
+            return False
 
     def _deep_update(self, d, u):
         for k, v in u.items():
@@ -133,117 +125,6 @@ class Store:
             else:
                 d[k] = v
         return d
-
-    def read(self, key=None, default=None):
-        if not os.path.exists(self.path):
-            return {} if key is None else default
-        try:
-            with file_lock(self.path, "shared", timeout=3) as f:
-                try:
-                    data = json.load(f)
-                except Exception:
-                    data = {}
-        except Exception:
-            data = {}
-        return data if key is None else self._get_nested(data, key.split("."), default)
-
-    def write(self, key, val, retry=5, retry_interval=0.1):
-        for _ in range(retry):
-            try:
-                with file_lock(self.path, "exclusive", timeout=3) as f:
-                    f.seek(0)
-                    try:
-                        data = json.load(f)
-                    except Exception:
-                        data = {}
-                    cur = data
-                    keys = key.split(".")
-                    for k in keys[:-1]:
-                        cur = cur.setdefault(k, {})
-                    last = keys[-1]
-                    if isinstance(cur.get(last), dict) and isinstance(val, dict):
-                        self._deep_update(cur[last], val)
-                    else:
-                        cur[last] = val
-                    f.seek(0)
-                    f.truncate()
-                    json.dump(data, f, ensure_ascii=False, indent=2)
-                    f.flush()
-                    os.fsync(f.fileno())
-                    return True
-            except Exception:
-                time.sleep(retry_interval)
-        return False
-
-    def delete(self, key):
-        try:
-            with file_lock(self.path, "exclusive", timeout=5) as f:
-                f.seek(0)
-                try:
-                    data = json.load(f)
-                except Exception:
-                    data = {}
-                cur = data
-                keys = key.split(".")
-                for k in keys[:-1]:
-                    cur = cur.get(k, {})
-                cur.pop(keys[-1], None)
-                f.seek(0)
-                f.truncate()
-                json.dump(data, f, ensure_ascii=False, indent=2)
-                f.flush()
-                os.fsync(f.fileno())
-                return True
-        except Exception:
-            return False
-
-    @staticmethod
-    def today(tomorrow_if_late=False, late_hour=23, late_minute=50):
-        now = datetime.now()
-        if tomorrow_if_late and now.hour >= late_hour and now.minute >= late_minute:
-            now += timedelta(days=1)
-        return now.strftime("%Y-%m-%d")
-
-    @staticmethod
-    def now():
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    @staticmethod
-    def sleep(seconds):
-        time.sleep(seconds)
-
-store = Store()
-
-class YamlStore:
-    def __init__(self, path="Cookie.yml"):
-        self.path = path
-        self.yaml = YAML()
-        self.yaml.preserve_quotes = True
-        self.yaml.indent(mapping=2, sequence=4, offset=2)
-
-    def _load(self):
-        if not os.path.exists(self.path):
-            return CommentedMap()
-        try:
-            with file_lock(self.path, "r", "shared"):
-                with open(self.path, "r", encoding="utf-8") as f:
-                    data = self.yaml.load(f) or CommentedMap()
-                    if not isinstance(data, (dict, CommentedMap)):
-                        raise ValueError("YAML 根元素必须是映射类型")
-                    return data
-        except Exception as e:
-            print(f"[YamlStore._load] 读取失败: {e}")
-            return CommentedMap()
-
-    def _save(self, data):
-        try:
-            with file_lock(self.path, "w", "exclusive"):
-                with open(self.path, "w", encoding="utf-8") as f:
-                    self.yaml.dump(data, f)
-            return True
-        except Exception as e:
-            print(f"[YamlStore._save] 写入失败: {e}")
-            return False
 
     def _get_nested(self, data, keys, default=None):
         cur = data
@@ -261,69 +142,100 @@ class YamlStore:
         return cur
 
     def read(self, key=None, default=None):
-        data = self._load()
+        with self.lock:
+            data = self._load()
         if not key:
             return data
         return self._get_nested(data, key.split("."), default)
 
-    def write(self, key, val):
-        try:
+    def write(self, key, val, retry=5, retry_interval=0.1):
+        for _ in range(retry):
+            try:
+                with self.lock:
+                    data = self._load()
+                    keys = key.split(".")
+                    cur = data
+
+                    for k in keys[:-1]:
+                        if k.isdigit() and isinstance(cur, (list, CommentedSeq)):
+                            k = int(k)
+                            while len(cur) <= k:
+                                cur.append(CommentedMap() if self.is_yaml else {})
+                            cur = cur[k]
+                        else:
+                            cur = cur.setdefault(k, CommentedMap() if self.is_yaml else {})
+
+                    last = keys[-1]
+                    if isinstance(cur.get(last), dict) and isinstance(val, dict):
+                        self._deep_update(cur[last], val)
+                    else:
+                        cur[last] = val
+
+                    return self._save(data)
+            except Exception as e:
+                print(f"[ConfigStore.write] 写入失败: {e}")
+                time.sleep(retry_interval)
+        return False
+
+    def delete(self, key):
+        with self.lock:
             data = self._load()
             keys = key.split(".")
             cur = data
-            for i, k in enumerate(keys[:-1]):
-                if k.isdigit():
-                    k = int(k)
-                    if not isinstance(cur, (list, CommentedSeq)):
-                        raise TypeError(f"路径 {'.'.join(keys[:i])} 应为列表")
-                    while len(cur) <= k:
-                        cur.append(CommentedMap())
-                    cur = cur[k]
+            for k in keys[:-1]:
+                if isinstance(cur, (dict, CommentedMap)):
+                    cur = cur.get(k, {})
+                elif isinstance(cur, (list, CommentedSeq)) and k.isdigit():
+                    idx = int(k)
+                    cur = cur[idx] if idx < len(cur) else {}
                 else:
-                    if not isinstance(cur, (dict, CommentedMap)):
-                        raise TypeError(f"路径 {'.'.join(keys[:i])} 应为字典")
-                    cur = cur.setdefault(k, CommentedMap())
-
+                    return False
             last = keys[-1]
-            if isinstance(cur, (list, CommentedSeq)) and last.isdigit():
-                last = int(last)
-                while len(cur) <= last:
-                    cur.append(None)
-                cur[last] = val
-            else:
-                cur[last] = val
-            return self._save(data)
-        except Exception as e:
-            print(f"[YamlStore.write] 写入失败: {e}")
-            return False
-
-    def delete(self, key):
-        data = self._load()
-        keys = key.split(".")
-        cur = data
-        for k in keys[:-1]:
             if isinstance(cur, (dict, CommentedMap)):
-                cur = cur.get(k, {})
-            elif isinstance(cur, (list, CommentedSeq)) and k.isdigit():
-                idx = int(k)
-                cur = cur[idx] if idx < len(cur) else {}
-            else:
-                return False
-        if isinstance(cur, (dict, CommentedMap)):
-            cur.pop(keys[-1], None)
-        elif isinstance(cur, (list, CommentedSeq)) and keys[-1].isdigit():
-            idx = int(keys[-1])
-            if idx < len(cur):
-                cur.pop(idx)
-        return self._save(data)
+                cur.pop(last, None)
+            elif isinstance(cur, (list, CommentedSeq)) and last.isdigit():
+                idx = int(last)
+                if idx < len(cur):
+                    cur.pop(idx)
+            return self._save(data)
 
     def update(self, values: dict):
-        data = self._load()
-        for k, v in values.items():
-            self.write(k, v)
-        return True
+        with self.lock:
+            data = self._load()
+            for k, v in values.items():
+                keys = k.split(".")
+                cur = data
+                for kk in keys[:-1]:
+                    cur = cur.setdefault(kk, CommentedMap() if self.is_yaml else {})
+                last = keys[-1]
+                if isinstance(cur.get(last), dict) and isinstance(v, dict):
+                    self._deep_update(cur[last], v)
+                else:
+                    cur[last] = v
+            return self._save(data)
 
-yamlstore = YamlStore()
+    @staticmethod
+    def today(tomorrow_if_late=False):
+        now = datetime.now()
+        if tomorrow_if_late and now.hour >= 23 and now.minute >= 50:
+            now += timedelta(days=1)
+        return now.strftime("%Y-%m-%d")
+
+    @staticmethod
+    def now():
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    @staticmethod
+    def sleep(seconds):
+        time.sleep(seconds)
+
+    def has_signed(self, key, tomorrow_if_late=False):
+        return self.read(key) == self.today(tomorrow_if_late)
+
+    def mark_signed(self, key):
+        self.write(key, self.today())
+
+store = Store("magic.json")
 
 class HookedAdapter(HTTPAdapter):
     _counter = count(1)

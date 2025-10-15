@@ -23,7 +23,7 @@ class CHDBits:
 
     def sign_in(self, cookie, i):
         signKey = f"chdbits_sign_{i}"
-        if store.read(signKey) == store.today(tomorrow_if_late=True):
+        if store.has_signed(signKey, tomorrow_if_late=True):
             return (f"账号 {i}: ✅ 今日已签到")
 
         def is_valid_answer(value):
@@ -74,7 +74,7 @@ class CHDBits:
             post_response = self.session.post(base_url, data=data)
             sign_in_message = re.findall(r'white">(.*?签到.*?)<', post_response.text)[0]
             if '获得' in sign_in_message:
-                store.write(signKey, store.today())
+                store.mark_signed(signKey)
                 sign_in_result = f"<b><span style='color: green'>签到成功</span></b>  {current_now}\n"
                 with open('/ql/data/log/chdbits_成功.html.txt', 'w', encoding='utf-8') as f:
                     f.write(post_response.html.html)
