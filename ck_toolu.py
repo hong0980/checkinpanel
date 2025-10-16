@@ -15,7 +15,7 @@ class ToolLu:
     @staticmethod
     def sign(cookie, i):
         signKey = f"tool_sign_{i}"
-        if store.read(signKey) == store.today():
+        if store.has_signed(signKey):
             return (f"账号 {i}: ✅ 今日已签到")
         try:
             s = requests.Session()
@@ -40,7 +40,7 @@ class ToolLu:
             last_time = re.findall(rf'<div class="mb-6">(最近签到时间：{current_date}.*?)</div>', r.text)
             color, status, last_time = ('green', '成功', last_time[0]) if last_time else ('red', '失败', '')
             if '成功' in status:
-                store.write(signKey, store.today())
+                store.mark_signed(signKey)
 
             return (f"---- {name} 在线工具 签到结果 ----\n"
                     f"<b><span style='color: {color}'>签到{status}</span></b>\n"

@@ -98,7 +98,7 @@ class ALiYun:
         if not ok:
             return f"{name} 签到失败：{info}\n"
 
-        store.write(signKey, store.today())
+        store.mark_signed(signKey)
         msg = f"--- {name} 阿里云盘 签到结果 ---\n"
         msg += f"本月已签到 {count} 次\n"
         ok, info = self.get_reward(access_token, count)
@@ -118,7 +118,7 @@ class ALiYun:
         for i, (name, acc) in enumerate(items, 1):
             signKey = f"aliyun_sign_{i}"
 
-            if store.read(signKey, '') == store.today():
+            if store.has_signed(signKey):
                 msg += f"{name} ✅ 今日已签到\n"
                 continue
 

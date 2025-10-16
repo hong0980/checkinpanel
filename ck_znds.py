@@ -15,7 +15,7 @@ class znds:
     @staticmethod
     def sign(cookie, i):
         signKey = f"znds_sign_{i}"
-        if store.read(signKey) == store.today():
+        if store.has_signed(signKey):
             return (f"账号 {i}: ✅ 今日已签到")
         try:
             s, url = HTMLSession(), 'https://www.znds.com/'
@@ -40,7 +40,7 @@ class znds:
                 common_part = f"<b><span style='color: orange'>{msg}</span></b>"
                 sign_msg = (f"<b><span style='color: green'>签到成功</span></b>\n{common_part}"
                             if '获得' in msg else common_part)
-                store.write(signKey, store.today())
+                store.mark_signed(signKey)
 
             f = s.get(f'{url}home.php?mod=spacecp&ac=credit')
             matches = re.findall(r'<em>\s*(金币|积分|威望|Z币):\s*</em>(\d+)', f.text)

@@ -15,14 +15,13 @@ class NicePT:
     @staticmethod
     def sign(cookie, i):
         signKey = f"nicept_sign_{i}"
-        if store.read(signKey) == store.today(tomorrow_if_late=True):
+        if store.has_signed(signKey, tomorrow_if_late=True):
             return (f"账号 {i}: ✅ 今日已签到")
 
         msg = f'<b><span style="color: purple">你今天已经签到了，请勿重复签到</span></b>\n'
         s = requests.session()
         s.headers.update({
             'Cookie': cookie, 'accept-language': 'zh-CN,zh;q=0.9',
-            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
         })
         wait_midnight()
@@ -42,7 +41,7 @@ class NicePT:
                 msg = (f"<b><span style='color: green'>签到成功。</span></b> "
                        f"{store.now()}\n{p.group(1)}{p.group(2)}\n"
                        if p and "獲得" in p.group(1) else f"<b><span style='color: red'>签到失败！</span></b>\n")
-                store.write(signKey, store.today())
+                store.mark_signed(signKey)
 
             pattern = (r'魔力值.*?:\s*(.*?)\s*<a.*?'
                        r'分享率：</font>\s*(.*?)\s*<font.*?'

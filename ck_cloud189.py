@@ -175,8 +175,8 @@ class Cloud189:
     def sign(self, phone, password, i):
         phone_masked = self.show_contact(phone)
         msg = f"--- {phone_masked} 天翼云盘签到结果 ---\n{store.now()}\n"
-        signKey = f"189_sign_{i}"
-        if store.read(signKey, '') == store.today():
+        signKey = f"cloud189_sign_{i}"
+        if store.has_signed(signKey):
             return f"{msg}✅ 今日已签到"
 
         sessionKey = self.tokenlogin(phone_masked) or self.userlogin(phone, password, phone_masked)
@@ -199,7 +199,7 @@ class Cloud189:
                 readable_str = datetime.fromisoformat(iso_str).astimezone().strftime("%Y-%m-%d %H:%M:%S")
                 msg += f"获得 {netdiskbonus}M 空间\n签到时间：{readable_str}"
             else:
-                store.write(signKey, store.today())
+                store.mark_signed(signKey)
                 msg += f"{sign_in_result}获得 {netdiskbonus}M 空间"
 
             url = 'https://m.cloud.189.cn/v2/drawPrizeMarketDetails.action?taskId=TASK_SIGNIN&activityId=ACT_SIGNIN'

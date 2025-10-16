@@ -77,7 +77,7 @@ def get_monthly_exp(session):
 
 def sign_in(cookie, i):
     signKey = f"smzdm_sign_{i}"
-    if store.read(signKey) == store.today():
+    if store.has_signed(signKey):
         return (f"账号 {i}: ✅ 今日已签到")
 
     session = HTMLSession()
@@ -150,7 +150,7 @@ def sign_in(cookie, i):
                      "已签" in signin_msg)
 
         if is_success:
-            store.write(signKey, store.today())
+            store.mark_signed(signKey)
         return msg
 
     except requests.exceptions.Timeout:

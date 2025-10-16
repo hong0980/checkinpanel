@@ -11,7 +11,7 @@ from utils import get_data, store, wait_midnight
 
 def hifiti_sign(cookies, i):
     signKey = f"hifiti_sign_{i}"
-    if store.read(signKey) == store.today(tomorrow_if_late=True):
+    if store.has_signed(signKey, tomorrow_if_late=True):
         return (f"账号 {i}: ✅ 今日已签到")
 
     url = "https://www.hifiti.com/"
@@ -37,7 +37,7 @@ def hifiti_sign(cookies, i):
     })
     p = session.post(f'{url}sg_sign.htm', headers=headers)
     if p.status_code == 200:
-        store.write(signKey, store.today())
+        store.mark_signed(signKey)
         message = p.json().get("message")
         headers.pop('X-Requested-With', None)
         r = session.get(url, headers=headers)

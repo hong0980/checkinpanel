@@ -14,7 +14,7 @@ class hei:
     @staticmethod
     def sign(cookie, i):
         signKey = f"51hei_sign_{i}"
-        if store.read(signKey) == store.today():
+        if store.has_signed(signKey):
             return (f"账号 {i}: ✅ 今日已签到")
 
         session = requests.session()
@@ -40,7 +40,7 @@ class hei:
                    f"<br><b>账户信息</b>\n")
             res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
             if '成功' in res:
-                store.write(signKey, store.today())
+                store.mark_signed(signKey)
 
         except Exception as e:
             return f"发生异常: {e}"

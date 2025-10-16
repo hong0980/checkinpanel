@@ -2,7 +2,7 @@
 
 <<'COMMENT'
 cron: 1 1 1 1 *
-new Env('安装 selenium playwright tesseract);
+new Env('安装 selenium playwright tesseract');
 COMMENT
 
 js_pkgs="playwright playwright-extra puppeteer-extra-plugin-stealth

@@ -16,7 +16,7 @@ class NASYUN:
     @staticmethod
     def sign(cookie, i):
         signKey = f"nasyun_sign_{i}"
-        if store.read(signKey) == store.today():
+        if store.has_signed(signKey):
             return (f"账号 {i}: ✅ 今日已签到")
 
         url, headers = 'http://www.nasyun.com/home.php', {"Cookie": cookie}
@@ -39,7 +39,7 @@ class NASYUN:
             msg = f"<b><span style='color: green'>签到成功</span></b>\n累计登录：{todays[0]} 次\n" \
                   if todays else sign_msg
             if todays:
-                store.write(signKey, store.today())
+                store.mark_signed(signKey)
 
             matches = re.findall(r'(云币|贡献|活跃|积分):\s*</em>(\d+)', f.text)
             res = f"---- {name} 那是云 签到结果 ----\n{msg}\n<b>账户信息</b>\n"

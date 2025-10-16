@@ -66,7 +66,7 @@ class V2ex:
     @staticmethod
     def sign(cookie, i):
         signKey = f"v2ex_sign_{i}"
-        if store.read(signKey) == store.today():
+        if store.has_signed(signKey):
             return (f"账号 {i}: ✅ 今日已签到")
 
         res = ''
@@ -93,7 +93,7 @@ class V2ex:
                 sign_button.click()
                 time.sleep(random.uniform(1.0, 2.0))
                 res += f"<b><span style='color: green'>签到成功</span></b>\n"
-                store.write(signKey, store.today())
+                store.mark_signed(signKey)
 
             money_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "input[value='查看我的账户余额']"))
