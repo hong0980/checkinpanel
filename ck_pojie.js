@@ -87,7 +87,7 @@ async function sign(cookie, index) {
 
         msg = `${msgHead}${username} ----\n`;
 
-        const task = await page.$('#um a[href*="mod=task&do=apply&id=2"]', opts);
+        const task = await page.$('#um a[href*="mod=task&id=2"]', opts);
         if (task) {
             const taskLink = await task.getAttribute('href');
             await page.goto(taskLink, opts);
@@ -96,7 +96,7 @@ async function sign(cookie, index) {
         }
 
         await magicJS.sleep(1000);
-        const signed = await page.locator('#um a[href*="mod=task&do=apply&id=2"]').count() === 0;
+        const signed = await page.locator('#um a[href*="mod=task&id=2"]').count() === 0;
         if (signed) {
             magicJS.write(signKey, magicJS.today())
             msg += `${magicJS.today()} '✅ 签到成功'\n`;

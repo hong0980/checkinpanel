@@ -105,8 +105,8 @@ class HDSky:
                            r'<font.*?当前做种.*?>\s*(\d+)\s*<img')
                 result = re.findall(pattern, r.text, re.DOTALL)[0]
                 res = (f"--- {result[0]} HDSky 签到结果 ---\n{msg}<br><b><span style='color: "
-                       f"{'purple' if '今天已经签到了' in cg_msg else 'orange'}'>{cg_msg}</span></b>\n\n"
-                       f'<b>账户信息</b>\n魔力值：{result[1]}\n'
+                       f"{'purple' if '今天已经签到了' in cg_msg else 'orange'}'>{cg_msg}</span></b>"
+                       f'\n<b>账户信息</b>\n魔力值：{result[1]}\n'
                        f'分享率：{result[2]}\n上传量：{result[3]}\n'
                        f'下载量：{result[4]}\n当前做种：{result[5]}')
             else:

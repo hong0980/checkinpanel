@@ -60,10 +60,13 @@ async function sign(username, password, index) {
             return `${msgHead}❌ 登录失败，用户名或密码错误`;
 
         await page.goto('/vip', opts);
-        await page.locator('a.erphp-checkin').click().catch(() => {});
-        await page.waitForLoadState('networkidle');
-        await page.reload(opts);
-        await magicJS.sleep(1000);
+        const checkinBtn = page.locator('a.erphp-checkin');
+        if (await checkinBtn.count() != 0) {
+            await checkinBtn.click().catch(() => {});
+            await page.waitForLoadState('networkidle');
+            await page.reload(opts);
+            await magicJS.sleep(1000);
+        }
         const success = await page.locator('text=已签到').isVisible({ timeout: 2000 });
 
         if (success) magicJS.write(signKey, magicJS.today());

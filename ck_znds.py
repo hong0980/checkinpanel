@@ -38,7 +38,7 @@ class znds:
             if match:
                 msg = re.sub(r'</p><p>', '\n', match.group(1))
                 common_part = f"<b><span style='color: orange'>{msg}</span></b>"
-                sign_msg = (f"<b><span style='color: green'>签到成功</span></b>\n{common_part}"
+                sign_msg = (f"<b><span style='color: green'>签到成功</span></b><br>{common_part}"
                             if '获得' in msg else common_part)
                 store.mark_signed(signKey)
 
@@ -47,7 +47,7 @@ class znds:
             credit_info = ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
 
             return (f"-- {name} 智能电视网 签到结果 --"
-                    f'\n{sign_msg}\n\n<b>账户信息</b>\n{credit_info}')
+                    f'\n{sign_msg}<br><b>账户信息</b>\n{credit_info}')
 
         except Exception:
             import traceback

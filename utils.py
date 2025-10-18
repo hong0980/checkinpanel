@@ -233,7 +233,7 @@ class Store:
         return self.read(key) == self.today(tomorrow_if_late)
 
     def mark_signed(self, key):
-        self.write(key, self.today())
+        return self.write(key, self.today())
 
 store = Store("magic.json")
 
