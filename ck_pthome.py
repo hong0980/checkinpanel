@@ -46,15 +46,17 @@ class PTHOME:
 
             res = f"---- {name} PTHOME 签到结果 ----\n"
             if "签到成功" in r.text:
-                store.mark_signed(signKey)
                 g = re.findall(r'<p>(这是您.*?魔力值。)</p>', r.text)[0]
+                store.mark_signed(signKey)
                 return f"{res}<b><span style='color: green'>签到成功</span></b>\n{g}\n\n{msg}"
             elif "抱歉" in r.text:
                 g = re.findall(r'\((签到已得\d+)\)', r.text)[0]
+                store.mark_signed(signKey)
                 return (f"{res}<b><span style='color: green'>您今天已经签到过了，请勿重复刷新。</span></b>"
                         f"\n今天{g}魔力值\n\n{msg}")
             else:
                 return f"{res}<b><span style='color: red'>签到失败</span></b>"
+
         else:
             return f"请求失败，状态码：{r.status_code}"
 

@@ -359,7 +359,7 @@ def wait_midnight(**kwargs):
     if session and base_url:
         for retry in range(retries):
             r = session.get(base_url)
-            if not re.search(r'今天已经签过到了|已经签到|今日已签', r.text):
+            if not re.search(r'今天已经签过到了|已经签到|今日已签|已签', r.text):
                 break
             print(f'检测到已签到，等待{stime}秒后重试... ({retry+1}/{retries})')
             store.sleep(stime)

@@ -39,8 +39,7 @@ class hei:
                    f"<b><span style='color: green'>签到成功</span></b>\n"
                    f"<br><b>账户信息</b>\n")
             res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
-            if '成功' in res:
-                store.mark_signed(signKey)
+            store.mark_signed(signKey)
 
         except Exception as e:
             return f"发生异常: {e}"

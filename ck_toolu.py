@@ -31,21 +31,22 @@ class ToolLu:
                 return (f"<b><span style='color: red'>签到失败</span></b>\n"
                         f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
+            store.mark_signed(signKey)
             c = s.get('https://id.tool.lu/credits')
             match = re.search(rf'{current_date}.*?积分</td>', c.text, re.DOTALL)
-            consecutive = re.findall(rf'{current_date}.*?(连续.*?积分)</td>', match.group(0), re.DOTALL)
-            consecutives = consecutive[0] + '\n' if consecutive else ''
-            daily_points = re.findall(rf'{current_date}.*?(每日.*?积分)</td>', c.text, re.DOTALL)[0]
+            consecutives = (re.findall(rf'{current_date}.*?(连续.*?积分)</td>', match.group(0), re.DOTALL)[0] + '\n') if match else ''
+            sign_daily = re.findall(rf'{current_date}.*?(每日.*?积分)</td>', c.text, re.DOTALL)[0]
+            period = re.findall(rf'{current_date}.*?{current_date}.*?(连续每\d+天签到奖励 \d+ 积分)</td>', c.text, re.DOTALL)
+            if period: sign_daily += f'\n{period[0]}'
+
             points = re.findall(r'>(.*?)<span class="badge bg-warning">(.*?)</span>', c.text)[0]
-            last_time = re.findall(rf'<div class="mb-6">(最近签到时间：{current_date}.*?)</div>', r.text)
+            last_time = re.findall(rf'<div class="mb-6">最近签到时间：({current_date}.*?)</div>', r.text)
             color, status, last_time = ('green', '成功', last_time[0]) if last_time else ('red', '失败', '')
-            if '成功' in status:
-                store.mark_signed(signKey)
 
             return (f"---- {name} 在线工具 签到结果 ----\n"
                     f"<b><span style='color: {color}'>签到{status}</span></b>\n"
-                    f"<br><b>账户信息</b>\n{consecutive_sign_in}\n{daily_points}\n"
-                    f"{consecutives}{points[0]}{points[1]}\n{last_time}")
+                    f"<br><b>账户信息</b>\n{consecutive_sign_in}\n{sign_daily}\n"
+                    f"{consecutives}{points[0]}{points[1]}\n最近签到时间：{last_time}")
 
         except Exception:
             import traceback
@@ -65,3 +66,4 @@ if __name__ == "__main__":
         send("在线工具 签到", result)
     else:
         print(result)
+    # print(result)
