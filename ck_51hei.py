@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 20 1 0 * * *
+cron: 20 1 0,12 * * *
 new Env('51黑电子论坛 签到');
 """
 import re, requests
@@ -14,8 +14,7 @@ class hei:
     @staticmethod
     def sign(cookie, i):
         signKey = f"51hei_sign_{i}"
-        if store.has_signed(signKey):
-            return (f"账号 {i}: ✅ 今日已签到")
+        if store.has_signed(signKey): return (f"账号 {i}: ✅ 今日已签到")
 
         session = requests.session()
         url = 'http://www.51hei.com/bbs/home.php?mod=spacecp&ac=credit&op=base'
@@ -33,13 +32,13 @@ class hei:
                 return (f"<b><span style='color: red'>签到失败</span></b>\n"
                         f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
+            store.mark_signed(signKey)
             pattern = r'<em>\s*(黑币|威望|积分|贡献):\s*</em>(\d+)'
             matches = re.findall(pattern, r.text)
             res = (f"--- {name} 51黑电子论坛 签到结果 ---\n"
                    f"<b><span style='color: green'>签到成功</span></b>\n"
                    f"<br><b>账户信息</b>\n")
             res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
-            store.mark_signed(signKey)
 
         except Exception as e:
             return f"发生异常: {e}"

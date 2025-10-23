@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 30 1 0 * * *
+cron: 30 1 0,13 * * *
 new Env('在线工具 签到');
 """
 
@@ -15,8 +15,8 @@ class ToolLu:
     @staticmethod
     def sign(cookie, i):
         signKey = f"tool_sign_{i}"
-        if store.has_signed(signKey):
-            return (f"账号 {i}: ✅ 今日已签到")
+        if store.has_signed(signKey): return (f"账号 {i}: ✅ 今日已签到")
+
         try:
             s = requests.Session()
             current_date = store.today()
@@ -34,7 +34,8 @@ class ToolLu:
             store.mark_signed(signKey)
             c = s.get('https://id.tool.lu/credits')
             match = re.search(rf'{current_date}.*?积分</td>', c.text, re.DOTALL)
-            consecutives = (re.findall(rf'{current_date}.*?(连续.*?积分)</td>', match.group(0), re.DOTALL)[0] + '\n') if match else ''
+            consecutive = re.findall(rf'{current_date}.*?(连续.*?积分)</td>', match.group(0), re.DOTALL)
+            consecutives = consecutive[0] + '\n' if consecutive else ''
             sign_daily = re.findall(rf'{current_date}.*?(每日.*?积分)</td>', c.text, re.DOTALL)[0]
             period = re.findall(rf'{current_date}.*?{current_date}.*?(连续每\d+天签到奖励 \d+ 积分)</td>', c.text, re.DOTALL)
             if period: sign_daily += f'\n{period[0]}'
