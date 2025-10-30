@@ -4,8 +4,8 @@ cron: 40 1 0,12 * * *
 new Env('智能电视网 签到');
 """
 import re
-from utils import get_data, store
 from notify_mtr import send
+from utils import get_data, store
 from requests_html import HTMLSession
 
 class znds:
@@ -15,8 +15,8 @@ class znds:
     @staticmethod
     def sign(cookie, i):
         signKey = f"znds_sign_{i}"
-        if store.has_signed(signKey):
-            return (f"账号 {i}: ✅ 今日已签到")
+        if store.has_signed(signKey): return (f"账号 {i}: ✅ 今日已签到")
+
         try:
             s, url = HTMLSession(), 'https://www.znds.com/'
             sign_msg = "<b><span style='color: red'>签到失败</span></b>"
@@ -40,7 +40,10 @@ class znds:
                 common_part = f"<b><span style='color: orange'>{msg}</span></b>"
                 sign_msg = (f"<b><span style='color: green'>签到成功</span></b><br>{common_part}"
                             if '获得' in msg else common_part)
-                store.mark_signed(signKey)
+                if store.mark_signed(signKey):
+                    print('签到记录成功')
+                else:
+                    print('签到记录失败')
 
             f = s.get(f'{url}home.php?mod=spacecp&ac=credit')
             matches = re.findall(r'<em>\s*(金币|积分|威望|Z币):\s*</em>(\d+)', f.text)

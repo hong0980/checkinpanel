@@ -31,7 +31,11 @@ class ToolLu:
                 return (f"<b><span style='color: red'>签到失败</span></b>\n"
                         f"账号({i})无法登录！可能Cookie失效，请重新修改")
 
-            store.mark_signed(signKey)
+            if store.mark_signed(signKey):
+                print('签到记录成功')
+            else:
+                print('签到记录失败')
+
             c = s.get('https://id.tool.lu/credits')
             match = re.search(rf'{current_date}.*?积分</td>', c.text, re.DOTALL)
             consecutive = re.findall(rf'{current_date}.*?(连续.*?积分)</td>', match.group(0), re.DOTALL)

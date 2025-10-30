@@ -56,7 +56,11 @@ class PTHOME:
                 else:
                     message += f"{res}<b><span style='color: red'>签到失败</span></b>"
 
-                if re.search(r'成功|已经签到过', message): store.mark_signed(signKey)
+                if re.search(r'成功|已经签到过', message):
+                    if store.mark_signed(signKey):
+                        print('签到记录成功')
+                    else:
+                        print('签到记录失败')
                 return message
 
             else:

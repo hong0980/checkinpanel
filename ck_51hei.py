@@ -38,7 +38,12 @@ class hei:
                    f"<b><span style='color: green'>签到成功</span></b>\n"
                    f"<br><b>账户信息</b>\n")
             res += ''.join([f'{match[0]}: {match[1]}\n' for match in matches])
-            if re.search(r'签到成功', res): store.mark_signed(signKey)
+
+            if re.search(r'签到成功', res):
+                if store.mark_signed(signKey):
+                    print('签到记录成功')
+                else:
+                    print('签到记录失败')
             return res
 
         except Exception as e:

@@ -271,7 +271,7 @@ class Cloud189:
 if __name__ == "__main__":
     check_items = get_data().get("CLOUD189", [])
     result = Cloud189(check_items).main()
-    if re.search(r'成功|失败|异常|错误|登录', result):
+    if re.search(r'成功|失败|异常|错误|登录|获得', result):
         send("天翼云盘 签到", result)
     else:
         print(result)

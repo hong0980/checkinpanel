@@ -2,7 +2,7 @@ from itertools import count
 from ruamel.yaml import YAML
 from requests import Response
 from tomlkit.items import AoT
-from filelock import FileLock
+from filelock import FileLock, Timeout
 from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 import os, sys, json, time, re, urllib.parse, tomllib, tomlkit
@@ -77,7 +77,7 @@ def update_data(table_name: str, match_field: str, match_value: str, updates: di
         f.write(tomlkit.dumps(doc).strip() + "\n")
 
 class Store:
-    def __init__(self, path="config.json"):
+    def __init__(self, path="magic.json"):
         self.path = path
         self.is_yaml = False
         self.lock = FileLock(f"{path}.lock")
@@ -103,7 +103,7 @@ class Store:
                     data = json.load(f)
                 return data
         except Exception as e:
-            print(f"[ConfigStore._load] 读取失败: {e}")
+            print(f"{self.path} 读取失败: {e}")
             return CommentedMap() if self.is_yaml else {}
 
     def _save(self, data):
@@ -115,7 +115,7 @@ class Store:
                     json.dump(data, f, ensure_ascii=False, indent=2)
             return True
         except Exception as e:
-            print(f"[ConfigStore._save] 写入失败: {e}")
+            print(f"{self.path} 写入失败: {e}")
             return False
 
     def _deep_update(self, d, u):
@@ -148,33 +148,42 @@ class Store:
             return data
         return self._get_nested(data, key.split("."), default)
 
-    def write(self, key, val, retry=5, retry_interval=0.1):
-        for _ in range(retry):
+    def write(self, key, val, retry=10, retry_interval=0.5):
+        for i in range(retry):
             try:
-                with self.lock:
+                with FileLock(f"{self.path}.lock", timeout=30):
                     data = self._load()
                     keys = key.split(".")
                     cur = data
 
                     for k in keys[:-1]:
-                        if k.isdigit() and isinstance(cur, (list, CommentedSeq)):
-                            k = int(k)
-                            while len(cur) <= k:
+                        if isinstance(cur, (list, CommentedSeq)) and k.isdigit():
+                            idx = int(k)
+                            while len(cur) <= idx:
                                 cur.append(CommentedMap() if self.is_yaml else {})
-                            cur = cur[k]
+                            cur = cur[idx]
                         else:
-                            cur = cur.setdefault(k, CommentedMap() if self.is_yaml else {})
+                            if k not in cur or not isinstance(cur[k], (dict, CommentedMap, list, CommentedSeq)):
+                                cur[k] = CommentedMap() if self.is_yaml else {}
+                            cur = cur[k]
 
                     last = keys[-1]
-                    if isinstance(cur.get(last), dict) and isinstance(val, dict):
+
+                    if isinstance(cur.get(last), (dict, CommentedMap)) and isinstance(val, dict):
                         self._deep_update(cur[last], val)
                     else:
                         cur[last] = val
 
                     return self._save(data)
+
+            except Timeout:
+                print(f"{key} 第{i+1}次等待锁超时，{retry_interval}秒后重试...")
+                store.sleep(retry_interval)
             except Exception as e:
-                print(f"[ConfigStore.write] 写入失败: {e}")
-                time.sleep(retry_interval)
+                print(f"{key} 写入异常: {e}")
+                store.sleep(retry_interval)
+
+        print(f"{key} 所有重试均失败，放弃写入。")
         return False
 
     def delete(self, key):
@@ -235,7 +244,7 @@ class Store:
     def mark_signed(self, key):
         return self.write(key, self.today())
 
-store = Store("magic.json")
+store = Store()
 
 class HookedAdapter(HTTPAdapter):
     _counter = count(1)

@@ -16,8 +16,8 @@ class Enshan:
     @staticmethod
     def sign(cookie, i):
         signKey = f"right_sign_{i}"
-        if store.has_signed(signKey):
-            return (f"账号 {i}: ✅ 今日已签到")
+        if store.has_signed(signKey): return (f"账号 {i}: ✅ 今日已签到")
+
         url, headers, session = 'https://www.right.com.cn/forum/home.php', \
         {"Cookie": cookie,
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
@@ -34,7 +34,11 @@ class Enshan:
             r = session.get(url, headers=headers)
             points = re.findall(r'tip="(.*?)">', r.text)
             if points:
-                store.mark_signed(signKey)
+                if store.mark_signed(signKey):
+                    print('签到记录成功')
+                else:
+                    print('签到记录失败')
+
             color, status = ('green', '成功') if points else ('red', '失败')
             return (f'---- {name} 恩山论坛 签到结果 ----\n'
                     f"<b><span style='color: {color}'>签到{status}</span></b>\n"

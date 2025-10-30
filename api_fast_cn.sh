@@ -21,11 +21,11 @@ config_alpine() {
     log INFO "📦 配置 Alpine 国内镜像源..."
     local repo_file="/etc/apk/repositories"
     if [ -f "$repo_file" ]; then
-        sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' "$repo_file" || {
+        sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' "$repo_file" || {
             log ERROR "Alpine 镜像源配置失败"
             return 1
         }
-        apk update &>/dev/null && log INFO "Alpine 镜像源已配置为阿里云" || log ERROR "Alpine 软件源更新失败"
+        apk update &>/dev/null && log INFO "Alpine 镜像源已配置为清华大学镜像" || log ERROR "Alpine 软件源更新失败"
     else
         log WARN "Alpine 配置文件 $repo_file 不存在，跳过配置"
     fi
@@ -44,16 +44,14 @@ cat > "$pip_conf_file" <<-EOF
 [global]
 index-url = https://pypi.tuna.tsinghua.edu.cn/simple/
 extra-index-url =
-    https://mirrors.aliyun.com/pypi/simple/
     https://pypi.mirrors.ustc.edu.cn/simple/
 
 [install]
 trusted-host =
     pypi.tuna.tsinghua.edu.cn
-    mirrors.aliyun.com
     pypi.mirrors.ustc.edu.cn
 EOF
-    [ $? -eq 0 ] && log INFO "Python pip 源已配置（清华+阿里云+中科大）" || log ERROR "Python pip 配置失败"
+    [ $? -eq 0 ] && log INFO "Python pip 源已配置（清华+中科大）" || log ERROR "Python pip 配置失败"
 }
 
 # 配置 NPM 镜像源
@@ -234,8 +232,8 @@ main() {
     log INFO "=========================================="
     log INFO "🎉 青龙面板国内加速配置完成！"
     log INFO "📋 已配置："
-    log INFO "   - Alpine 软件源 → 阿里云"
-    log INFO "   - Python pip → 清华+阿里云+中科大"
+    log INFO "   - Alpine 软件源 → 清华大学"
+    log INFO "   - Python pip → 清华+中科大"
     log INFO "   - NPM → 淘宝镜像 + Node.js 环境变量"
     # log INFO "   - CPAN → 中科大镜像（追加或新建）"
     log INFO ""
