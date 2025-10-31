@@ -738,127 +738,91 @@ function MagicJS(scriptName = "MagicJS", logLevel = "INFO") {
 
 async function networkLog(page, options = {}) {
     const {
-        filter = null,
-        saveToFile = null,
         body_length = 500,
         filename = 'network-log.json',
-        excludeExtensions = ['png', 'jpg', 'jpeg', 'gif', 'ttf', 'css', 'ico', 'svg']
+        filter = null,                 // 只捕获包含 filter 的 URL
+        saveToFile = false,            // 是否保存日志到文件
+        excludeDomains = [],           // 可以追加排除的域名
+        excludeExtensions = [],        // 可以追加排除的扩展名
     } = options;
 
-    const magicjs = MagicJS('networkLog', 'INFO');
     const logs = [];
-    let capturedToken = null;
+    const magicjs = MagicJS('networkLog', 'INFO');
+    const defaultExcludeDomains = ['google', 'baidu'];
+    const defaultExcludeExt = ['png', 'jpg', 'jpeg', 'gif', 'ttf', 'css', 'ico', 'svg', 'woff', 'woff2'];
+    const allExcludeExt = [...defaultExcludeExt, ...excludeExtensions];
+    const allExcludeDomains = [...defaultExcludeDomains, ...excludeDomains];
 
-    const shouldExclude = (url) => {
-        if (!excludeExtensions || excludeExtensions.length === 0) return false;
-        const extPattern = excludeExtensions.join('|');
-        const regex = new RegExp(`\\.(${extPattern})(\\?.*)?$`, 'i');
-        return regex.test(url);
+    const shouldExclude = url => {
+        return allExcludeExt.some(ext => url.match(new RegExp(`\\.${ext}(\\?.*)?$`, 'i'))) ||
+            allExcludeDomains.some(domain => url.includes(domain));
     };
 
-    const shouldPassFilter = (url) => {
+    const shouldPassFilter = url => {
         if (!filter) return true;
         const filters = Array.isArray(filter) ? filter : [filter];
         return filters.some(f => url.includes(f));
     };
 
-    const mapRequest = (req, cookies) => ({
-        时间: req.timestamp,
-        方法: req.method,
-        请求地址: req.url,
-        请求头: req.headers,
-        请求体: req.postData || '无请求体',
-        Cookie: cookies || req.headers['cookie'] || '无 Cookie'
-    });
-
-    const mapResponse = (res, setCookies) => ({
-        时间: res.timestamp,
-        状态码: res.status,
-        请求地址: res.url,
-        响应头: res.headers,
-        响应内容预览: res.bodyPreview,
-        SetCookie: setCookies || res.headers['set-cookie'] || '无 Set-Cookie'
-    });
-
-    async function getPageCookies(page) {
+    async function getCookies() {
         try {
-            if (typeof page.context === 'function') {
-                const cookies = await page.context().cookies();
-                return cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; ');
-            } else {
-                const cookies = await page.cookies();
-                return cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; ');
-            }
-        } catch (e) {
-            console.error('获取页面 Cookie 失败:', e.message);
-            return '无页面 Cookie';
+            const cookies = await page.context().cookies();
+            return cookies.map(c => `${c.name}=${c.value}`).join('; ');
+        } catch {
+            return '无 Cookie';
         }
     }
 
-    const onRequest = async (request) => {
-        if (!shouldPassFilter(request.url())) return;
-        if (shouldExclude(request.url())) return;
+    const onRequest = async request => {
+        const url = request.url();
+        if (shouldExclude(url) || !shouldPassFilter(url)) return;
 
-        const pageCookies = await getPageCookies(page);
         const reqLog = {
-            timestamp: magicjs.now(),
-            method: request.method(),
-            url: request.url(),
-            headers: request.headers(),
-            postData: request.postData() || ''
+            时间: magicjs.now(),
+            方法: request.method(),
+            请求地址: url,
+            请求头: request.headers(),
+            请求体: request.postData() || '',
+            Cookie: await getCookies()
         };
-        logs.push({ 类型: '请求', ...mapRequest(reqLog, pageCookies) });
-        console.log('\n=== 请求 ===\n', mapRequest(reqLog, pageCookies));
+        logs.push({ 类型: '请求', ...reqLog });
+        console.log('\n=== 请求 ===\n', reqLog);
     };
 
-    const onResponse = async (response) => {
-        if (!shouldPassFilter(response.url())) return;
-        if (shouldExclude(response.url())) return;
+    const onResponse = async response => {
+        const url = response.url();
+        if (shouldExclude(url) || !shouldPassFilter(url)) return;
+
+        let bodyPreview = '';
+        try { bodyPreview = (await response.text()).substring(0, body_length); }
+        catch { bodyPreview = '<无法读取响应体>'; }
 
         const resLog = {
-            timestamp: magicjs.now(),
-            status: response.status(),
-            url: response.url(),
-            headers: response.headers()
+            时间: magicjs.now(),
+            状态码: response.status(),
+            请求地址: url,
+            响应头: response.headers(),
+            响应内容预览: bodyPreview,
+            SetCookie: response.headers()['set-cookie'] || '无 Set-Cookie'
         };
+        logs.push({ 类型: '响应', ...resLog });
+        console.log('\n--- 响应 ---\n', resLog);
 
-        try {
-            const body = await response.text();
-            resLog.bodyPreview = body.substring(0, body_length);
-        } catch (e) {
-            resLog.bodyPreview = `响应体读取失败: ${e.message}`;
-        }
-
-        const setCookies = response.headers()['set-cookie'];
-        const setCookieValue = Array.isArray(setCookies) ? setCookies.join('; ') : setCookies || '无 Set-Cookie';
-
-        logs.push({ 类型: '响应', ...mapResponse(resLog, setCookieValue) });
-        console.log('\n--- 响应 ---\n', mapResponse(resLog, setCookieValue));
-
-        if (saveToFile) {
-            fs.writeFileSync(path.resolve('/tmp', filename), JSON.stringify(logs, null, 2), 'utf-8');
-        }
+        if (saveToFile) fs.writeFileSync(`/tmp/${filename}`, JSON.stringify(logs, null, 2), 'utf-8');
     };
 
     page.on('request', onRequest);
     page.on('response', onResponse);
 
-    function stop() {
+    const stop = () => {
         page.off('request', onRequest);
         page.off('response', onResponse);
-        if (saveToFile) {
-            fs.writeFileSync(path.resolve('/tmp', filename), JSON.stringify(logs, null, 2), 'utf-8');
-        }
-    }
+        if (saveToFile) fs.writeFileSync(`/tmp/${filename}`, JSON.stringify(logs, null, 2), 'utf-8');
+    };
 
     page.on('close', stop);
-    if (typeof page.context === 'function') {
-        try {
-            page.context().on('close', stop);
-        } catch (_) {}
-    }
 
-    return { logs, stop, getToken: () => capturedToken };
+    return { logs, stop };
 }
 
 module.exports = {

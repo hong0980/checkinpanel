@@ -3,13 +3,12 @@
 cron "1 0,11 * * *" ck_ourbits.js
  */
 
-const utils = require('./utils');
-const Env = utils.Env;
+const { Env, networkLog, MagicJS, getData } = require('./utils');
 
 const $ = new Env('亿破姐 签到');
 const notify = $.isNode() ? require('./notify') : '';
-const magicJS = utils.MagicJS('亿破姐', 'INFO');
-const COOKIES_YPOJIE = utils.getData().YPOJIE;
+const magicJS = MagicJS('亿破姐', 'INFO');
+const COOKIES_YPOJIE = getData().YPOJIE;
 
 const fs = require('fs');
 // const { rimraf } = require('rimraf');
@@ -47,6 +46,12 @@ async function sign(username, password, index) {
     const { browser, page } = await setupBrowser();
     const opts = { waitUntil: 'networkidle', timeout: 20000 };
 
+    const logger = await networkLog(page, {
+        saveToFile: true,                       // 是否保存到文件
+        filter: ['www.ypojie.com'],             // 只捕获相关请求
+        filename: `ypojie_log_${index}.json`,   // 保存到 /tmp/pojie_log_1.json
+        excludeExtensions: ['js']
+    });
     try {
         await page.goto('/wp-login.php', { waitUntil: 'domcontentloaded' });
         await page.fill('#user_login', username);
@@ -70,6 +75,8 @@ async function sign(username, password, index) {
         const success = await page.locator('text=已签到').isVisible({ timeout: 2000 });
 
         if (success) magicJS.write(signKey, magicJS.today());
+
+        logger.stop();
 
         return `${magicJS.now()}\n${msgHead}${username} ----\n${success ? '签到成功 ✅' : '签到失败 ❌'}\n${await getAssets(page)}`;
 

@@ -3,17 +3,15 @@
 cron "2 0,11 * * *" ck_pojie.js
  */
 
-const utils = require('./utils');
-const notify = require('./notify');
-const Env = utils.Env;
-
-const $ = new Env('吾爱破解 签到');
-const magicJS = utils.MagicJS('吾爱破解', 'INFO');
-const COOKIES_POJIE = utils.getData().POJIE;
-
 const fs = require('fs');
+const notify = require('./notify');
 // const { rimraf } = require('rimraf');
 const { chromium } = require('playwright');
+const { Env, networkLog, MagicJS, getData } = require('./utils');
+
+const $ = new Env('吾爱破解 签到');
+const magicJS = MagicJS('吾爱破解', 'INFO');
+const COOKIES_POJIE = getData().POJIE;
 
 async function setupBrowser() {
     const browser = await chromium.launch({
@@ -75,6 +73,12 @@ async function sign(cookie, index) {
     });
     await context.addCookies(cookies);
 
+    const logger = await networkLog(page, {
+        saveToFile: true,                       // 是否保存到文件
+        filter: ['home.php', 'task', 'apply'],  // 只捕获相关请求
+        filename: `pojie_log_${index}.json`,    // 保存到 /tmp/pojie_log_1.json
+    });
+
     try {
         await page.goto('/forum.php', opts);
         const [upmine, integral, username] = await Promise.allSettled([
@@ -83,31 +87,48 @@ async function sign(cookie, index) {
             page.locator('strong.vwmy a[href*="uid="]').textContent({ timeout: 2000 })
         ]).then(r => r.map(x => x.status === 'fulfilled' ? x.value : null));
 
-        if (!username) return `${msgHead}❌ Cookie 可能失效，请重新获取`;
+        if (!username) return `${msgHead} ❌ Cookie 可能失效，请重新获取`;
 
         msg = `${msgHead}${username} ----\n`;
 
-        const task = await page.$('#um a[href*="mod=task&id=2"]', opts);
-        if (task) {
-            const taskLink = await task.getAttribute('href');
-            await page.goto(taskLink, opts);
-            await magicJS.sleep(2000);
-            await page.goto('/forum.php', opts);
+        const qds = page.locator('#um img[src*="qds.png"]');
+
+        if (await qds.count() > 0) {
+            const parentHref = await qds.first().evaluate(img => img.closest('a')?.href);
+            if (parentHref) {
+                await page.goto(parentHref, opts);
+                await page.waitForTimeout(2000);
+                await page.goto('/forum.php', opts);
+                await magicJS.sleep(1000);
+            }
         }
 
-        await magicJS.sleep(1000);
-        const signed = await page.locator('#um a[href*="mod=task&id=2"]').count() === 0;
-        if (signed) {
+        const wbs = page.locator('#um img[src*="wbs.png"]');
+        if (await wbs.count() === 0) {
             magicJS.write(signKey, magicJS.today())
-            msg += `${magicJS.today()} '✅ 签到成功'\n`;
+            msg += `${magicJS.today()} ✅ 签到成功\n`;
         } else {
-            msg += `${magicJS.today()} '❌ 签到失败'\n`;
+            msg += `${magicJS.today()} ℹ️ 今天已经签到\n`;
         }
-        msg += `积分: ${integral} | 威望: ${upmine}`
+        await page.goto('/home.php?mod=spacecp&ac=credit&op=base', opts);
+        const wuaibi = (await page.locator('li:has(em:has-text("吾爱币"))').innerText())
+            .match(/\d+\s*CB/)?.[0] || null;
+        msg += `积分: ${integral} | 吾爱币： ${wuaibi} | 威望: ${upmine}`
 
         const content = await page.content()
         fs.writeFileSync('/tmp/52pojie.html', content);
         await page.screenshot({ path: '/tmp/52pojie.png', fullPage: true });
+
+        // ✅ 在最后停止捕获并保存日志
+        logger.stop();
+
+        // ✅ 你可以从 logger.logs 中直接获取请求响应
+        const logSummary = logger.logs.map(l => `${l.类型} → ${l.请求地址 || l.地址 || '未知'}`).join('\n');
+        fs.writeFileSync(`/tmp/pojie_summary_${index}.log`, logSummary);
+
+        // 可选：打印出是否成功调用任务接口
+        const taskApply = logger.logs.find(l => l.地址?.includes('mod=task') && l.类型 === '请求');
+        if (taskApply) msg += `🕵️ 捕获到任务请求：${taskApply.请求地址}\n`;
 
     } catch (err) {
         msg += `❌ 异常: ${err.message}`;
