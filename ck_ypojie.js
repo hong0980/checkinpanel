@@ -1,30 +1,32 @@
 /*
 亿破姐 签到
-cron "1 0,11 * * *" ck_ourbits.js
- */
+cron "1 0,11 * * *" ck_ypojie.js
+*/
 
 const { Env, networkLog, MagicJS, getData } = require('./utils');
-
 const $ = new Env('亿破姐 签到');
 const notify = $.isNode() ? require('./notify') : '';
 const magicJS = MagicJS('亿破姐', 'INFO');
 const COOKIES_YPOJIE = getData().YPOJIE;
 
 const fs = require('fs');
-// const { rimraf } = require('rimraf');
 const { chromium } = require('playwright');
+let browser, success;
 
-async function setupBrowser({
-    headless = true,
-    baseURL = 'https://www.ypojie.com',
-    executablePath = '/usr/bin/chromium-browser',
-    userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-} = {}) {
-    const browser = await chromium.launch({ headless, executablePath });
-    const context = await browser.newContext({ baseURL, userAgent });
-    const page = await context.newPage();
+async function setupBrowser() {
+    if (!browser) {
+        browser = await chromium.launch({
+            headless: true,
+            executablePath: '/usr/bin/chromium-browser',
+        });
+    }
 
-    return { browser, page };
+    const context = await browser.newContext({
+        baseURL: 'https://www.ypojie.com',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    });
+
+    return { browser, context };
 }
 
 async function getAssets(page) {
@@ -38,20 +40,21 @@ async function getAssets(page) {
     }
 }
 
-async function sign(username, password, index) {
+async function sign(browser, username, password, index, context) {
     const signKey = `ypojie_sign_${index}`;
     if (magicJS.read(signKey) === magicJS.today()) return `账号 ${index}: ✅ 今日已签到`;
 
-    const msgHead = `---- 账号 ${index}: `;
-    const { browser, page } = await setupBrowser();
+    let msg = '签到失败 ❌';
+    const msgHead = `账号 ${index}: `;
+    const page = await context.newPage();
     const opts = { waitUntil: 'networkidle', timeout: 20000 };
-
     const logger = await networkLog(page, {
-        saveToFile: true,                       // 是否保存到文件
-        filter: ['www.ypojie.com'],             // 只捕获相关请求
-        filename: `ypojie_log_${index}.json`,   // 保存到 /tmp/pojie_log_1.json
+        saveToFile: true,
+        filter: ['www.ypojie.com'],
+        filename: `ypojie_log_${index}.json`,
         excludeExtensions: ['js']
     });
+
     try {
         await page.goto('/wp-login.php', { waitUntil: 'domcontentloaded' });
         await page.fill('#user_login', username);
@@ -61,51 +64,52 @@ async function sign(username, password, index) {
             page.click('#wp-submit')
         ]);
 
-        if (!(await page.locator(`text=${username}`).isVisible()))
-            return `${msgHead}❌ 登录失败，用户名或密码错误`;
+        if (!(await page.locator(`text=${username}`).isVisible({ timeout: 2000 })))
+            return `${msgHead} ❌ 登录失败，用户名或密码错误`;
 
         await page.goto('/vip', opts);
         const checkinBtn = page.locator('a.erphp-checkin');
-        if (await checkinBtn.count() != 0) {
+        if (await checkinBtn.isVisible({ timeout: 2000 })) {
             await checkinBtn.click().catch(() => {});
             await page.waitForLoadState('networkidle');
             await page.reload(opts);
-            await magicJS.sleep(1000);
+            success = await page.locator('text=已签到').isVisible({ timeout: 2000 });
+            if (success) {
+                msg = '✅ 签到成功'
+            };
+        } else {
+            msg = 'ℹ️ 已签到过'
         }
-        const success = await page.locator('text=已签到').isVisible({ timeout: 2000 });
-
-        if (success) magicJS.write(signKey, magicJS.today());
-
+        magicJS.write(signKey, magicJS.today())
         logger.stop();
 
-        return `${magicJS.now()}\n${msgHead}${username} ----\n${success ? '签到成功 ✅' : '签到失败 ❌'}\n${await getAssets(page)}`;
-
+        const assets = await getAssets(page);
+        return `${magicJS.now()}\n${msgHead}${username}\n${msg}\n${assets}`;
     } catch (err) {
         return `${msgHead} ❌ 异常: ${err.message}`;
     } finally {
-        await browser.close().catch(() => {});
+        await page.close().catch(() => {});
     }
 }
 
 async function main() {
+    const { browser, context } = await setupBrowser();
     let msgAll = '=== 亿破姐 签到结果 ===\n';
-    let notifyMsg = msgAll;
 
     for (let i = 0; i < COOKIES_YPOJIE.length; i++) {
-        const { username, password } = COOKIES_YPOJIE[i] || [];
+        const { username, password } = COOKIES_YPOJIE[i] || {};
         const signMsg = (!username || !password)
-            ? `账号 ${i + 1}: ❌ Cookie 为空`
-            : await sign(username, password, i + 1);
-
-        const formatted = `${signMsg}\n--------------------------\n\n`;
-        msgAll += formatted;
-
-        if (!signMsg.includes('签到过了')) notifyMsg += formatted;
-        if (i < COOKIES_YPOJIE.length - 1) await magicJS.sleep(3000);
+            ? `账号 ${i + 1}: ❌ 用户名或密码为空`
+            : await sign(browser, username, password, i + 1, context);
+        msgAll += signMsg;
+        if (i < COOKIES_YPOJIE.length - 1) await magicJS.sleep(2000);
     }
+
     $.log(msgAll);
     magicJS.done();
-    if (/成功|失败|异常|失效/.test(notifyMsg)) notify.sendNotify('亿破姐 签到', msgAll);
+    if (/成功|失败|异常|失效/.test(msgAll)) notify.sendNotify('亿破姐 签到', msgAll);
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
 }
 
 main().catch(err => {
