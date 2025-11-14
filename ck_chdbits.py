@@ -101,7 +101,7 @@ class CHDBits:
             ) + '\n\n'
 
             user_info = re.findall(
-                r"UltimateUser_Name'><b>(.*?)</b>.*?"
+                r"_Name'><b>(.*?)</b>.*?"
                 r'使用</a>]:\s*?(.*?)\s*?<.*?'
                 r'分享率：</font>\s*?(.*?)\s*?<.*?'
                 r'上传量：</font>\s*?(.*?)\s*?<.*?'

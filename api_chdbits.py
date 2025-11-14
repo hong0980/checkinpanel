@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-cron: 30 15,19 * * *
+cron: 30 19 * * *
 new Env('chdbits 最新电影信息');
 """
 
@@ -74,7 +74,7 @@ class Get:
                                f"【 完成数 】: {snatched}\n"
                                f"详细信息\n{cleaned_content}\n\n")
 
-            pattern = (r'UltimateUser_Name.*?><b>(.*?)</b>.*?'
+            pattern = (r'_Name.*?><b>(.*?)</b>.*?'
                        r'使用</a>]: (.*?)\s*'
                        r'<.*?分享率：</font>\s*(.*?)\s*'
                        r'<.*?上传量：</font>\s*(.*?)\s*'

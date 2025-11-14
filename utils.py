@@ -79,12 +79,10 @@ def update_data(table_name: str, match_field: str, match_value: str, updates: di
 class Store:
     def __init__(self, path="magic.json"):
         self.path = path
-        self.is_yaml = False
-        self.lock = FileLock(f"{path}.lock")
         self.ext = os.path.splitext(path)[1].lower()
-
-        if self.ext in [".yaml", ".yml"]:
-            self.is_yaml = True
+        self.is_yaml = self.ext in [".yaml", ".yml"]
+        self.lock = FileLock(f"{path}.lock")
+        if self.is_yaml:
             self.yaml = YAML()
             self.yaml.preserve_quotes = True
             self.yaml.indent(mapping=2, sequence=4, offset=2)
@@ -92,7 +90,6 @@ class Store:
     def _load(self):
         if not os.path.exists(self.path):
             return CommentedMap() if self.is_yaml else {}
-
         try:
             with open(self.path, "r", encoding="utf-8") as f:
                 if self.is_yaml:
@@ -107,12 +104,14 @@ class Store:
             return CommentedMap() if self.is_yaml else {}
 
     def _save(self, data):
+        tmp_path = f"{self.path}.tmp"
         try:
-            with open(self.path, "w", encoding="utf-8") as f:
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 if self.is_yaml:
                     self.yaml.dump(data, f)
                 else:
                     json.dump(data, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, self.path)
             return True
         except Exception as e:
             print(f"{self.path} 写入失败: {e}")
@@ -136,7 +135,7 @@ class Store:
                 else:
                     return default
             elif isinstance(cur, (dict, CommentedMap)):
-                cur = cur.get(k)
+                cur = cur.get(k, default)
             else:
                 return default
         return cur
@@ -149,33 +148,12 @@ class Store:
         return self._get_nested(data, key.split("."), default)
 
     def write(self, key, val, retry=10, retry_interval=0.5):
-        """
-        多进程安全多层级写入：
-        - FileLock 确保只有一个进程能操作；
-        - 再次从文件读取保证是最新数据；
-        - 临时文件 + os.replace() 保证写入原子；
-        - 自动递归创建多层 key。
-        """
+        keys = key.split(".")
         for i in range(retry):
             try:
-                with FileLock(f"{self.path}.lock", timeout=30):
-                    # 第一次读取最新内容
+                with self.lock:
                     data = self._load()
 
-                    # 二次读取文件最新版本（防止读取缓存或其他进程更新）
-                    if os.path.exists(self.path):
-                        try:
-                            with open(self.path, "r", encoding="utf-8") as f:
-                                current_data = (
-                                    self.yaml.load(f) if self.is_yaml else json.load(f)
-                                )
-                            if isinstance(current_data, (dict, CommentedMap)):
-                                self._deep_update(data, current_data)
-                        except Exception:
-                            pass  # 如果文件在别的进程正写入中，忽略这次异常
-
-                    # 创建多层级 key
-                    keys = key.split(".")
                     cur = data
                     for k in keys[:-1]:
                         if isinstance(cur, (list, CommentedSeq)) and k.isdigit():
@@ -189,29 +167,22 @@ class Store:
                             cur = cur[k]
 
                     last = keys[-1]
-                    if isinstance(cur.get(last), (dict, CommentedMap)) and isinstance(val, dict):
+                    if isinstance(cur.get(last), dict) and isinstance(val, dict):
                         self._deep_update(cur[last], val)
                     else:
                         cur[last] = val
 
-                    # 临时写入（原子替换）
-                    tmp_path = f"{self.path}.tmp"
-                    with open(tmp_path, "w", encoding="utf-8") as f:
-                        if self.is_yaml:
-                            self.yaml.dump(data, f)
-                        else:
-                            json.dump(data, f, ensure_ascii=False, indent=2)
-                    os.replace(tmp_path, self.path)
+                    if not self._save(data):
+                        raise IOError("保存失败")
 
-                    # print(f"[WRITE] {key} = {val}")
                     return True
 
             except Timeout:
                 print(f"{key} 第{i+1}次等待锁超时，{retry_interval}秒后重试...")
-                self.sleep(retry_interval)
+                time.sleep(retry_interval)
             except Exception as e:
-                print(f"{key} 写入异常: {e}")
-                self.sleep(retry_interval)
+                print(f"{key} 写入异常: {e}, {retry_interval}秒后重试...")
+                time.sleep(retry_interval)
 
         print(f"{key} 所有重试均失败，放弃写入。")
         return False
